@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: networkrepair-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   powershell-51:
     name: Windows PowerShell 5.1
@@ -12,7 +19,7 @@ jobs:
       run:
         shell: powershell
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Parse PowerShell scripts
         run: |
           $files = Get-ChildItem -Path . -Filter *.ps1 -Recurse
@@ -44,6 +51,6 @@ jobs:
             if ($errors.Count -gt 0) { $errors | Format-List *; throw "Syntax errors found in $($file.FullName)" }
           }
       - name: Install Pester
-        run: Install-Module Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser -SkipPublisherCheck
+        run: Install-Module Pester -RequiredVersion 5.9.1 -Force -Scope CurrentUser -SkipPublisherCheck
       - name: Run Pester
         run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
