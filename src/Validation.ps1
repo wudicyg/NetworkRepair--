@@ -1,4 +1,4 @@
-function Invoke-NRValidation {
+﻿function Invoke-NRValidation {
     param([Parameter(Mandatory)]$Before,[switch]$SkipConnectivityTest)
     Write-NRLog 'Starting post-repair validation.'
     $after = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
