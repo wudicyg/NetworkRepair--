@@ -1,9 +1,11 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Menu','Scan','DryRun','Repair','DeepRepair','Backup','Restore','Report','Version')]
+    [ValidateSet('Menu','Scan','DryRun','Repair','DeepRepair','Backup','Restore','Report','Rename','Version')]
     [string]$Mode = 'Menu',
     [string]$BackupPath,
     [string]$ReportPath,
+    [string]$NetworkId,
+    [string]$NewName,
     [switch]$Json,
     [switch]$SkipConnectivityTest,
     [switch]$Yes,
@@ -12,7 +14,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Script:AppName = 'NetworkRepair'
-$Script:AppVersion = '0.2.0'
+$Script:AppVersion = '0.3.0-dev'
 $Script:Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Script:Src = Join-Path $Script:Root 'src'
 $Script:Backups = Join-Path $Script:Root 'backups'
@@ -21,6 +23,7 @@ $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'Common.ps1')
 . (Join-Path $Script:Src 'Diagnostics.ps1')
 . (Join-Path $Script:Src 'NetworkListManager.ps1')
+. (Join-Path $Script:Src 'NetworkIdentity.ps1')
 . (Join-Path $Script:Src 'Ncsi.ps1')
 . (Join-Path $Script:Src 'Backup.ps1')
 . (Join-Path $Script:Src 'Repair.ps1')
@@ -44,6 +47,7 @@ function Show-NRMenu {
     Write-NRLine '  [5] 从备份恢复' 'White'
     Write-NRLine '  [6] 导出诊断报告' 'White'
     Write-NRLine '  [7] Dry Run（只预览，不修改）' 'White'
+    Write-NRLine '  [8] 安全重命名网络（显式指定 NetworkId）' 'White'
     Write-NRLine '  [0] 退出' 'White'
     Write-NRLine ''
 }
@@ -61,6 +65,7 @@ function Invoke-NRMenu {
             '5' { $p = Read-Host '请输入备份目录或 .reg 文件路径'; if ($p) { Restore-NRBackup -BackupPath $p -AssumeYes:$Yes | Out-Null }; Pause-NR }
             '6' { $r = Export-NRReport; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
             '7' { Invoke-NRRepair -Deep:$false -DryRun -AssumeYes:$false | Out-Null; Pause-NR }
+            '8' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
             '0' { return 0 }
             default { Write-NRLine '无效选择。' 'Yellow'; Start-Sleep -Milliseconds 700 }
         }
@@ -85,6 +90,12 @@ try {
         'Repair' { $r = Invoke-NRRepair -Deep:$false -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'DeepRepair' { $r = Invoke-NRRepair -Deep:$true -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'Backup' { $r = New-NRBackup; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('备份完成：{0}' -f $r.Path) 'Green' } }
+        'Rename' {
+            if (-not $NetworkId -or -not $NewName) { throw 'Rename 模式必须提供 -NetworkId 和 -NewName。' }
+            $r = Invoke-NRNetworkRenameOperation -NetworkId $NetworkId -NewName $NewName -AssumeYes:$Yes
+            if ($Json) { $r | ConvertTo-Json -Depth 8 }
+            if (-not $r.Success) { exit 7 }
+        }
         'Restore' { if (-not $BackupPath) { throw 'Restore 模式必须提供 -BackupPath。' }; $r = Restore-NRBackup -BackupPath $BackupPath -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 6 } }
         'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
     }
