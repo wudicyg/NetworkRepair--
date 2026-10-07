@@ -1,4 +1,4 @@
-function Initialize-NRPaths {
+﻿function Initialize-NRPaths {
     foreach ($p in @($Script:Backups, $Script:Logs, $Script:Reports)) {
         if (-not (Test-Path -LiteralPath $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
     }
