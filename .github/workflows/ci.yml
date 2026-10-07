@@ -23,7 +23,7 @@ jobs:
             if ($errors.Count -gt 0) { $errors | Format-List *; throw "Syntax errors found in $($file.FullName)" }
           }
       - name: Install Pester
-        run: Install-Module Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser -SkipPublisherCheck
+        run: Install-Module Pester -RequiredVersion 5.9.1 -Force -Scope CurrentUser -SkipPublisherCheck
       - name: Run Pester
         run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
   powershell-7:
