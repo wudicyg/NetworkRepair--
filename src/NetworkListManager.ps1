@@ -1,4 +1,4 @@
-function Get-NRNetworkListManagerNetworks {
+﻿function Get-NRNetworkListManagerNetworks {
     try {
         $manager = New-Object -ComObject NetworkListManager
         # NLM_ENUM_NETWORK_ALL = CONNECTED (1) | DISCONNECTED (2)
