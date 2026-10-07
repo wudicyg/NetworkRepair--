@@ -171,7 +171,7 @@ function Get-NRDiagnostics {
     $ncsi = Test-NRNcsi -Skip:$SkipConnectivityTest
 
     $safeCandidates = @($suspects | Where-Object RemediationAllowed)
-    $highRisk = @($suspects | Where-Object RiskLevel -in @('High','Caution'))
+    $highRisk = @($suspects | Where-Object { $_.RiskLevel -eq 'High' -or $_.RiskLevel -eq 'Caution' })
     $issueDetails = New-Object System.Collections.Generic.List[object]
 
     if ($safeCandidates.Count) { [void]$issueDetails.Add([pscustomobject]@{Code='NR1001';Severity='Low';Message=('发现 {0} 个疑似历史/重复网络 Profile。' -f $safeCandidates.Count)}) }
