@@ -12,12 +12,12 @@
 - [ ] 更多语言环境测试
 
 ## v0.2.x — 更智能的诊断
-- [ ] Network List Manager COM 枚举
-- [ ] Profile 与 Network Signature 关联分析
-- [ ] 更细的风险评分
-- [ ] DNS / DHCP / 默认网关诊断
-- [ ] NCSI 诊断信息
-- [ ] 统一诊断代码
+- [x] Network List Manager COM 枚举
+- [x] Profile 与活动 Network List 对象交叉验证（基础版）
+- [x] 风险评分与可解释原因
+- [x] DNS / DHCP / 默认网关诊断
+- [x] NCSI DNS / HTTP 诊断
+- [x] 统一诊断代码
 
 ## v0.3.x — 更完整的修复能力
 - [ ] 安全网络名称重命名
