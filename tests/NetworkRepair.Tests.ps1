@@ -71,6 +71,17 @@ Describe 'Network identity safety' {
         $r.NetworkName | Should -Be 'Office'
     }
 
+    It 'uses exact NetworkId correlation to protect a connected numbered profile' {
+        $p=[pscustomobject]@{KeyName='{12345678-1234-1234-1234-123456789ABC}';ProfileName='Network 2';Category=0;Managed=0;RegistryPath='HKLM:\dummy';LastWrite=(Get-Date)}
+        $i=[pscustomobject]@{ProfileKeyName=$p.KeyName;NetworkId='12345678-1234-1234-1234-123456789abc';NetworkName='Office';NlmIsConnected=$true;Correlation='ExactNetworkId'}
+        $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @() -IdentityCorrelations @($i))[0]
+        $r.NetworkId | Should -Be '12345678-1234-1234-1234-123456789abc'
+        $r.NetworkCorrelation | Should -Be 'ExactNetworkId'
+        $r.IsActive | Should -BeTrue
+        $r.RemediationAllowed | Should -BeFalse
+        $r.DiagnosticCodes | Should -Contain 'NR1002'
+    }
+
     It 'rejects invalid network names' {
         (Test-NRNetworkName -Name ('a' * 129)).Valid | Should -BeFalse
         (Test-NRNetworkName -Name 'bad/name').Valid | Should -BeFalse
