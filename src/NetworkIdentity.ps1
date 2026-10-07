@@ -107,8 +107,18 @@ function Invoke-NRNetworkRenameOperation {
         [pscustomobject]@{Success=$true;Changed=$true;Cancelled=$false;NetworkId=$NetworkId;OldName=$before.Name;NewName=$after.Name;Backup=$backup.Path}
     }
     catch {
-        Write-NRLog ('Network rename failed: {0}' -f $_.Exception.Message) 'ERROR'
+        $errorMessage = $_.Exception.Message
+        Write-NRLog ('Network rename failed: {0}' -f $errorMessage) 'ERROR'
+        $nameRollback = $null
+        try {
+            $current = Find-NRNetworkById -NetworkId $NetworkId
+            if ($current.Name -ne $before.Name) {
+                $nameRollback = Rename-NRNetworkName -NetworkId $NetworkId -NewName $before.Name -AssumeYes:$true
+            }
+        } catch {
+            Write-NRLog ('Network name rollback failed: {0}' -f $_.Exception.Message) 'ERROR'
+        }
         $rollback = Restore-NRBackup -BackupPath $backup.Path -AssumeYes:$true
-        [pscustomobject]@{Success=$false;Changed=$false;Cancelled=$false;NetworkId=$NetworkId;OldName=$before.Name;NewName=$NewName;Error=$_.Exception.Message;Backup=$backup.Path;Rollback=$rollback}
+        [pscustomobject]@{Success=$false;Changed=$false;Cancelled=$false;NetworkId=$NetworkId;OldName=$before.Name;NewName=$NewName;Error=$errorMessage;Backup=$backup.Path;NameRollback=$nameRollback;Rollback=$rollback}
     }
 }
