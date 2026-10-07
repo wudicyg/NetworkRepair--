@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  powershell-51:
+    name: Windows PowerShell 5.1
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell scripts
+        run: |
+          $files = Get-ChildItem -Path . -Filter *.ps1 -Recurse
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | Format-List *; throw "Syntax errors found in $($file.FullName)" }
+          }
+      - name: Install Pester
+        run: Install-Module Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser -SkipPublisherCheck
+      - name: Run Pester
+        run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
+  powershell-7:
+    name: PowerShell 7
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell scripts
+        run: |
+          $files = Get-ChildItem -Path . -Filter *.ps1 -Recurse
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | Format-List *; throw "Syntax errors found in $($file.FullName)" }
+          }
+      - name: Install Pester
+        run: Install-Module Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser -SkipPublisherCheck
+      - name: Run Pester
+        run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
