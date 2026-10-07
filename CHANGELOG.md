@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0-dev]
+
+### Added
+- Registry Profile GUID 与 Network List Manager NetworkId 精确关联。
+- 显式 NetworkId 网络重命名命令。
+- 重命名前自动备份，修改后验证，失败自动恢复。
+- Windows 网络名称输入规则验证。
+
+
 ## [0.2.0] - 2026-10-08
 
 ### Added
