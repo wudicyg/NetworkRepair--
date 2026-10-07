@@ -78,6 +78,8 @@ try {
     [void]$relaunch.Add('-Mode'); [void]$relaunch.Add($Mode)
     if ($BackupPath) { [void]$relaunch.Add('-BackupPath'); [void]$relaunch.Add(('"{0}"' -f ($BackupPath -replace '"','\"'))) }
     if ($ReportPath) { [void]$relaunch.Add('-ReportPath'); [void]$relaunch.Add(('"{0}"' -f ($ReportPath -replace '"','\"'))) }
+    if ($NetworkId) { [void]$relaunch.Add('-NetworkId'); [void]$relaunch.Add($NetworkId) }
+    if ($NewName) { [void]$relaunch.Add('-NewName'); [void]$relaunch.Add(('"{0}"' -f $NewName)) }
     if ($Json) { [void]$relaunch.Add('-Json') }
     if ($SkipConnectivityTest) { [void]$relaunch.Add('-SkipConnectivityTest') }
     if ($Yes) { [void]$relaunch.Add('-Yes') }
