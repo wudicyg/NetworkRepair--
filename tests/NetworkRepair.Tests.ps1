@@ -3,6 +3,7 @@
         $root = Split-Path -Parent $PSScriptRoot
         . (Join-Path $root 'src\Common.ps1')
         . (Join-Path $root 'src\NetworkListManager.ps1')
+        . (Join-Path $root 'src\NetworkIdentity.ps1')
         . (Join-Path $root 'src\Ncsi.ps1')
         . (Join-Path $root 'src\Diagnostics.ps1')
     }
@@ -53,5 +54,27 @@ Describe 'NetworkRepair v0.2.0 helper behavior' {
 
     It 'exposes Network List Manager diagnostic reader' {
         (Get-Command Get-NRNetworkListManagerNetworks -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
+    }
+}
+
+
+Describe 'Network identity safety' {
+    It 'normalizes GUID values consistently' {
+        (Normalize-NRGuidKey -Value '{12345678-1234-1234-1234-123456789ABC}') | Should -Be '12345678-1234-1234-1234-123456789abc'
+    }
+
+    It 'correlates an exact registry Profile key with a NetworkId' {
+        $profile=[pscustomobject]@{KeyName='{12345678-1234-1234-1234-123456789ABC}';ProfileName='Network 2'}
+        $network=[pscustomobject]@{NetworkId='12345678-1234-1234-1234-123456789abc';Name='Office';IsConnected=$false;IsConnectedToInternet=$false;ConnectionCount=1}
+        $r=@(Get-NRNetworkIdentityCorrelation -RegistryProfiles @($profile) -NlmNetworks @($network))[0]
+        $r.Correlation | Should -Be 'ExactNetworkId'
+        $r.NetworkName | Should -Be 'Office'
+    }
+
+    It 'rejects invalid network names' {
+        (Test-NRNetworkName -Name ('a' * 129)).Valid | Should -BeFalse
+        (Test-NRNetworkName -Name 'bad/name').Valid | Should -BeFalse
+        (Test-NRNetworkName -Name '   ').Valid | Should -BeFalse
+        (Test-NRNetworkName -Name 'Office').Valid | Should -BeTrue
     }
 }
