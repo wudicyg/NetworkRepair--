@@ -1,4 +1,4 @@
-function New-NRBackup {
+﻿function New-NRBackup {
     $stamp=Get-Date -Format 'yyyyMMdd_HHmmss_fff';$dir=Join-Path $Script:Backups $stamp;New-Item -ItemType Directory -Path $dir -Force|Out-Null
     $reg=Join-Path $dir 'NetworkList.reg';$diag=Join-Path $dir 'diagnostic.json';$meta=Join-Path $dir 'manifest.json'
     Write-NRLog ('Creating backup: {0}'-f $dir);& reg.exe export 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList' $reg /y|Out-Null;$regExit=$LASTEXITCODE
