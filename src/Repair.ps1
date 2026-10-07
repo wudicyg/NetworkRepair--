@@ -22,7 +22,7 @@ function Invoke-NRRepair {
         if(!$validation.Success){throw '修复后验证失败，准备自动回滚。'}
         Write-NRLog ('Repair succeeded. Changed={0}'-f $changed);return [pscustomobject]@{Success=$true;Changed=$changed;Candidates=$plan.SafeProfileDeletions;Backup=$backup;Validation=$validation;Deep=[bool]$Deep;DryRun=$false}
     }catch{
-        Write-NRLog ('Repair failed: {0}'-f $_.Exception.Message) 'ERROR';$restore=Restore-NRBackup -BackupPath $backup.Path -AssumeYes;return [pscustomobject]@{Success=$false;Changed=$changed;Error=$_.Exception.Message;Backup=$backup;Rollback=$restore}
+        Write-NRLog ('Repair failed: {0}'-f $_.Exception.Message) 'ERROR';$restore=Restore-NRBackup -BackupPath $backup.Path -AssumeYes:$true;return [pscustomobject]@{Success=$false;Changed=$changed;Error=$_.Exception.Message;Backup=$backup;Rollback=$restore}
     }
 }
 function Clear-NRNewNetworks {
