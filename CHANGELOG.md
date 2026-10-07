@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0] - 2026-10-08
+
+### Added
+- Network List Manager COM 网络对象诊断。
+- Profile 风险评分、风险等级和可解释诊断码。
+- IP / DHCP / 默认网关 / DNS 诊断。
+- NCSI DNS 与 HTTP Web Probe 诊断。
+
+### Changed
+- Safe Repair 改为依据 `RemediationAllowed` 安全门槛执行。
+- 修复后验证增加 IP 与默认网关完整性检查。
+
+
+
 ## [0.1.1] - 2026-10-08
 
 ### Fixed
