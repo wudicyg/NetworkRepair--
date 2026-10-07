@@ -40,7 +40,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Parse PowerShell scripts
         run: |
           $files = Get-ChildItem -Path . -Filter *.ps1 -Recurse
