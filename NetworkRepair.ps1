@@ -12,7 +12,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Script:AppName = 'NetworkRepair'
-$Script:AppVersion = '0.1.1'
+$Script:AppVersion = '0.2.0'
 $Script:Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Script:Src = Join-Path $Script:Root 'src'
 $Script:Backups = Join-Path $Script:Root 'backups'
@@ -20,6 +20,8 @@ $Script:Logs = Join-Path $Script:Root 'logs'
 $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'Common.ps1')
 . (Join-Path $Script:Src 'Diagnostics.ps1')
+. (Join-Path $Script:Src 'NetworkListManager.ps1')
+. (Join-Path $Script:Src 'Ncsi.ps1')
 . (Join-Path $Script:Src 'Backup.ps1')
 . (Join-Path $Script:Src 'Repair.ps1')
 . (Join-Path $Script:Src 'Validation.ps1')
