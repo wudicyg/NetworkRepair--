@@ -2,7 +2,7 @@
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
-> 当前版本：**0.1.1**
+> 当前版本：**0.2.0**
 
 NetworkRepair 的目标不是“暴力清理注册表”，而是：
 
@@ -22,6 +22,10 @@ NetworkRepair 的目标不是“暴力清理注册表”，而是：
 - JSON 诊断报告
 - CLI 模式与交互式菜单
 - Pester 安全规则测试
+- Network List Manager COM 交叉诊断
+- 风险评分与可解释诊断码
+- IP / DHCP / 默认网关 / DNS 诊断
+- NCSI DNS / HTTP 探测
 
 ## 快速开始
 
@@ -66,7 +70,7 @@ NetworkRepair.bat -Mode Scan -SkipConnectivityTest
 
 ### Deep Repair
 
-在 Safe Repair 基础上刷新 `NewNetworks`。v0.1.0 **不会**无条件删除 `Signatures\Managed` / `Signatures\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
+在 Safe Repair 基础上刷新 `NewNetworks`。v0.2.0 **不会**无条件删除 `Signatures\Managed` / `Signatures\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
 
 ## 备份
 
