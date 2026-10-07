@@ -1,4 +1,4 @@
-function Get-NRAdapters {
+﻿function Get-NRAdapters {
     try { @(Get-NetAdapter -ErrorAction Stop | Select-Object Name,InterfaceDescription,InterfaceIndex,Status,MacAddress,LinkSpeed,MediaType,Virtual) } catch { Write-NRLog ('Get-NetAdapter failed: {0}' -f $_.Exception.Message) 'WARN'; @() }
 }
 function Get-NRConnectionProfiles {
@@ -13,7 +13,7 @@ function Test-NRInternetConnectivity {
     [pscustomobject]@{Skipped=$false;DNS=$dnsOk;TCP443=$tcpOk}
 }
 function Get-NRSuspiciousProfiles {
-    param([Parameter(Mandatory)][object[]]$RegistryProfiles,[Parameter(Mandatory)][string[]]$ActiveNames)
+    param([Parameter(Mandatory)][object[]]$RegistryProfiles,[string[]]$ActiveNames = @())
     $activeSet=@{};foreach($n in $ActiveNames){if($n){$activeSet[$n.ToLowerInvariant()]=$true}}
     foreach($p in $RegistryProfiles){
         if([string]::IsNullOrWhiteSpace($p.ProfileName)){continue}
