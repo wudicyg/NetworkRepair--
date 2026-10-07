@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Menu','Scan','DryRun','Repair','DeepRepair','Backup','Restore','Report','Version')]
     [string]$Mode = 'Menu',
