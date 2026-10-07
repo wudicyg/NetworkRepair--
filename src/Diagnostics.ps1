@@ -112,7 +112,7 @@ function Get-NRSuspiciousProfiles {
         [Parameter(Mandatory)][object[]]$RegistryProfiles,
         [string[]]$ActiveNames = @(),
         [string[]]$NlmActiveNames = @()
-        ,[object[]]$IdentityCorrelations = @()
+        [object[]]$IdentityCorrelations = @()
     )
     $activeSet = @{}
     foreach ($n in @($ActiveNames + $NlmActiveNames)) { if ($n) { $activeSet[$n.ToLowerInvariant()] = $true } }
