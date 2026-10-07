@@ -1,4 +1,4 @@
-$Script:NcsiRegistryPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\NlaSvc\Parameters\Internet'
+﻿$Script:NcsiRegistryPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\NlaSvc\Parameters\Internet'
 
 function Get-NRNcsiConfiguration {
     $item = Get-ItemProperty -LiteralPath $Script:NcsiRegistryPath -ErrorAction SilentlyContinue
