@@ -1,4 +1,4 @@
-Describe 'NetworkRepair safety rules' {
+﻿Describe 'NetworkRepair safety rules' {
     BeforeAll {
         $root = Split-Path -Parent $PSScriptRoot
         . (Join-Path $root 'src\Common.ps1')
