@@ -1,0 +1,14 @@
+# Runtime data
+backups/*
+!backups/.gitkeep
+logs/*
+!logs/.gitkeep
+reports/*
+!reports/.gitkeep
+*.tmp
+*.bak
+*.user
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
