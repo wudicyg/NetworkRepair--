@@ -45,6 +45,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
 - Restore 只导入 NetworkRepair 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
+- 多级恢复点：备份按 `Manual` / `PreRepair` / `PreRestore` 分级，可列举、按序号恢复、固定保护，并按保留额度显式清理
 - 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair 前仍执行完整重新诊断
 
 ## 快速开始
@@ -150,11 +151,39 @@ backups/
 
 Restore 不再直接导入完整的 `NetworkList.reg`，以避免把 NetworkRepair 未管理的 Registry 子树一并覆盖。恢复失败时，工具会自动使用 Restore 前刚创建的安全备份，仅回滚上述 managed scopes。
 
-可以恢复：
+### 恢复点等级与保留
+
+`manifest.json` 记录每个恢复点的等级：
+
+- `Manual`：菜单元 [4] 或 `-Mode Backup` 手动创建。
+- `PreRepair`：修复前自动创建的安全点。
+- `PreRestore`：恢复前自动创建的安全点，保证任何一次 Restore 都还能再回滚。
+- 旧版备份没有等级字段时按 `Manual` 处理；未知等级按保守策略保留，不参与清理。
+
+安全性：安全点（`PreRepair` / `PreRestore`）享有比普通恢复点更高的保留下限，已固定（`Pinned`）的恢复点永不参与清理；清理只允许删除 `backups\` 的直接子目录。
+
+### 恢复与恢复点管理
+
+列出恢复点（按时间新→旧编号）：
 
 ```bat
-NetworkRepair.bat -Mode Restore -BackupPath "backups\\20261008_190429_297" -Yes
+NetworkRepair.bat -Mode RestorePoints
 ```
+
+按序号恢复，或按路径恢复（兼容旧用法）：
+
+```bat
+NetworkRepair.bat -Mode Restore -RestorePointIndex 1 -Yes
+NetworkRepair.bat -Mode Restore -BackupPath "backups\20261008_190429_297" -Yes
+```
+
+清理超出保留额度的恢复点（先展示计划，确认后才删除）：
+
+```bat
+NetworkRepair.bat -Mode Prune
+```
+
+交互式菜单 [5] 会先列出可选恢复点，然后可选择 `R` 按序号恢复、`P` 清理、`F` 固定/取消固定，也可以直接输入备份目录或 `.reg` 路径。
 
 ## 日志
 
