@@ -15,7 +15,8 @@ if (-not (Test-Path -LiteralPath $entry)) {
 }
 
 $content = Get-Content -LiteralPath $entry -Raw -Encoding UTF8
-$match = [regex]::Match($content, "\$Script:AppVersion\s*=\s*'([^']+)'")
+$pattern = '\$Script:AppVersion\s*=\s*''([^'']+)''' 
+$match = [regex]::Match($content, $pattern)
 if (-not $match.Success) {
     throw 'Unable to determine NetworkRepair version from NetworkRepair.ps1.'
 }
