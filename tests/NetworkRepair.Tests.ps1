@@ -102,6 +102,17 @@
         $r.DiagnosticCodes | Should -Contain 'NR1003'
     }
 
+    It 'keeps sanitized bundle version synchronized with the entry script' {
+        $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
+        $entryPath = Join-Path $root 'NetworkRepair.ps1'
+        $tool = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
+        $entry = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $tool | Should -Match 'entryVersionMatch'
+        $tool | Should -Match '\$Script:AppVersion = \\$entryVersionMatch.Groups\[1\].Value'
+        $tool | Should -Not -Match "\$Script:AppVersion = '0.4.0-dev'"
+        $entry | Should -Match '\$Script:AppVersion'
+    }
+
     It 'keeps sanitized bundle numbered profile regexes intact' {
         $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
         $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
