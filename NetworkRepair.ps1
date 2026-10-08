@@ -16,7 +16,25 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Script:AppName = 'NetworkRepair'
 $Script:AppVersion = '1.0.0'
-$Script:Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+# 入口路径解析：以脚本宿主（powershell.exe -File）运行时取脚本自身路径；打包成单个 exe 后
+# $MyInvocation.MyCommand 没有 Path 属性，需要退回到进程映像与应用程序基目录，否则在
+# Set-StrictMode -Version Latest 下会直接抛「找不到属性 Path」。
+$Script:EntryPath = $null
+$entryCommand = $MyInvocation.MyCommand
+if ($entryCommand) {
+    $entryPathProperty = $entryCommand.PSObject.Properties['Path']
+    if ($entryPathProperty -and -not [string]::IsNullOrWhiteSpace([string]$entryPathProperty.Value)) {
+        $Script:EntryPath = [string]$entryPathProperty.Value
+    }
+}
+if (-not $Script:EntryPath) { $Script:EntryPath = [string](Get-Variable -Name 'PSCommandPath' -ValueOnly -ErrorAction SilentlyContinue) }
+if ([string]::IsNullOrWhiteSpace($Script:EntryPath)) {
+    try { $Script:EntryPath = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $Script:EntryPath = $null }
+}
+$Script:HostImage = $null
+try { $Script:HostImage = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $Script:HostImage = $null }
+$Script:ScriptHost = [bool]($Script:HostImage -and (@('powershell','pwsh') -contains [IO.Path]::GetFileNameWithoutExtension($Script:HostImage)))
+if ($Script:EntryPath) { $Script:Root = Split-Path -Parent $Script:EntryPath } else { $Script:Root = [AppDomain]::CurrentDomain.BaseDirectory }
 $Script:Src = Join-Path $Script:Root 'src'
 $Script:Backups = Join-Path $Script:Root 'backups'
 $Script:Logs = Join-Path $Script:Root 'logs'

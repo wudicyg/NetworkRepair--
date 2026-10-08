@@ -776,4 +776,89 @@
         $common=Get-Content -LiteralPath (Join-Path $root 'src\Common.ps1') -Raw -Encoding UTF8
         $common | Should -Match 'function Write-NRSafeLog'
     }
+
+    It 'keeps a UTF-8 BOM on every PowerShell script' {
+        # Windows PowerShell 5.1 在中文区域会按 ANSI 解码没有 BOM 的脚本，中文注释里的多字节
+        # 序列可能被还原成引号或括号，直接把脚本解析搞崩。这条约定必须由测试守住。
+        $scripts = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.ps1 | Where-Object { $_.FullName -notmatch '\\(backups|logs|reports)\\' })
+        $scripts.Count | Should -BeGreaterThan 0
+
+        $missing = @()
+        foreach ($script in $scripts) {
+            $bytes = [IO.File]::ReadAllBytes($script.FullName)
+            $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+            if (-not $hasBom) { $missing += $script.FullName.Substring($root.Length + 1) }
+        }
+        $missing.Count | Should -Be 0 -Because ('缺少 UTF-8 BOM 的脚本：' + ($missing -join ', '))
+    }
+
+    It 'flattens every module into one runnable single-file script' {
+        $out=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_dist_{0}'-f [guid]::NewGuid().ToString('N'))
+        try {
+            $result = & (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -OutputDirectory $out -SkipExecutable | ConvertFrom-Json
+            $result.Success | Should -BeTrue
+            $result.InlinedModuleCount | Should -BeGreaterThan 5
+            (Test-Path -LiteralPath $result.SingleScript) | Should -BeTrue
+            (Test-Path -LiteralPath $result.Launcher) | Should -BeTrue
+
+            $merged = Get-Content -LiteralPath $result.SingleScript -Raw -Encoding UTF8
+            $merged | Should -Not -Match ([regex]::Escape('Join-Path $Script:Src'))
+            foreach ($function in @('Initialize-NRPaths','Get-NRNetworkListManagerNetworks','Get-NRRestorePoints','Invoke-NRServiceRefresh')) {
+                $merged | Should -Match ([regex]::Escape('function ' + $function))
+            }
+
+            # 启动器必须是纯 ASCII：批处理对中文内容和代码页都很敏感，中文只应出现在文件名上。
+            $launcherBytes = [IO.File]::ReadAllBytes($result.Launcher)
+            (@($launcherBytes | Where-Object { $_ -gt 127 }).Count) | Should -Be 0
+
+            # 单文件脚本必须真的能跑起来，而不只是「看起来压平了」。
+            $output = (& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File $result.SingleScript -Mode Version) -join ' '
+            $output | Should -Match 'NetworkRepair v'
+        } finally {Remove-Item -LiteralPath $out -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'packages one obvious Chinese-named entry for regular users' {
+        $packager = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRReleasePackage.ps1') -Raw -Encoding UTF8
+        $packager | Should -Match ([regex]::Escape("'使用说明.md'"))
+        $packager | Should -Match '网络修复工具'
+        # 中文文件名必须用 UTF-8 条目名写入 zip，否则解压后是乱码。
+        $packager | Should -Match 'CreateFromDirectory'
+        $packager | Should -Match 'UTF8'
+        # 旧的 ASCII 启动器不再随包分发，避免普通用户在两个入口之间犹豫。
+        $packager | Should -Not -Match ([regex]::Escape("'NetworkRepair.bat'"))
+
+        $quickStart = Get-Content -LiteralPath (Join-Path $root '使用说明.md') -Raw -Encoding UTF8
+        $quickStart | Should -Match '网络修复工具\.exe'
+        $quickStart | Should -Match '备用启动'
+    }
+
+    It 'resolves the entry path even when the host exposes no script path' {
+        # 打包成 exe 后 $MyInvocation.MyCommand 没有 Path 属性；入口解析必须退回到进程映像，
+        # 否则 Set-StrictMode 会把「找不到属性 Path」升级成致命错误。
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match 'PSObject\.Properties\[''Path''\]'
+        $entry | Should -Match 'MainModule\.FileName'
+        $entry | Should -Not -Match ([regex]::Escape('Split-Path -Parent $MyInvocation.MyCommand.Path'))
+
+        $common = Get-Content -LiteralPath (Join-Path $root 'src\Common.ps1') -Raw -Encoding UTF8
+        $common | Should -Match 'ScriptHost'
+        $common | Should -Match 'EntryPath'
+    }
+
+    It 'keeps GitHub workflow files free of non-ASCII text' {
+        # runner 会把 run 脚本写成「不带 BOM 的 UTF-8」临时文件，Windows PowerShell 5.1 在中文
+        # 区域按 ANSI 解码后，内联中文会被还原成引号并导致整个步骤解析失败（真实踩过）。
+        # 因此工作流保持纯 ASCII，中文只出现在带 BOM 的仓库脚本里。
+        $workflowDirectory = Join-Path $root '.github\workflows'
+        $workflows = @(Get-ChildItem -LiteralPath $workflowDirectory -File -Filter *.yml)
+        $workflows.Count | Should -BeGreaterThan 0
+
+        $offenders = @()
+        foreach ($workflow in $workflows) {
+            $text = Get-Content -LiteralPath $workflow.FullName -Raw -Encoding UTF8
+            $nonAscii = @($text.ToCharArray() | Where-Object { [int]$_ -gt 127 })
+            if ($nonAscii.Count -gt 0) { $offenders += ('{0}（{1} 个非 ASCII 字符）' -f $workflow.Name, $nonAscii.Count) }
+        }
+        $offenders.Count | Should -Be 0 -Because ('工作流文件必须保持纯 ASCII：' + ($offenders -join ', '))
+    }
 }

@@ -22,9 +22,17 @@ function Assert-NRAdministrator {
     $id=[Security.Principal.WindowsIdentity]::GetCurrent(); $principal=New-Object Security.Principal.WindowsPrincipal($id)
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         if ([string]::IsNullOrWhiteSpace($RelaunchArguments)) { $RelaunchArguments='-Mode Menu' }
-        $scriptPath=Join-Path $Script:Root 'NetworkRepair.ps1'
-        $argText='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" {1}' -f $scriptPath,$RelaunchArguments
-        Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $argText -Verb RunAs | Out-Null
+        $hostImage=$Script:HostImage
+        if ($Script:ScriptHost -and $Script:EntryPath) {
+            # 脚本宿主：以管理员身份重新运行入口脚本本身。
+            $argText='-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" {1}' -f $Script:EntryPath,$RelaunchArguments
+            Start-Process -FilePath $hostImage -ArgumentList $argText -Verb RunAs | Out-Null
+        } elseif ($hostImage) {
+            # 已打包为单个 exe：以管理员身份重新启动自身。
+            Start-Process -FilePath $hostImage -ArgumentList $RelaunchArguments -Verb RunAs | Out-Null
+        } else {
+            throw '无法确定入口程序路径，无法自动提升权限。请以管理员身份重新运行。'
+        }
         exit 0
     }
     Write-NRLog 'Administrator privileges confirmed.'
