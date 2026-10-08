@@ -72,7 +72,7 @@ function Invoke-NRRepair {
         Write-NRLine '正在创建完整备份，请稍候...' 'Cyan'
     }
     Write-NRLog 'Repair execution started.'
-    $backup = New-NRBackup
+    $backup = New-NRBackup -Level 'PreRepair'
     if (-not $Json) {
         Write-NRLine ('备份完成：{0}' -f $backup.Path) 'Green'
     }
