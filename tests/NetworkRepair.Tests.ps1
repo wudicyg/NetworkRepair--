@@ -247,6 +247,32 @@
         $decision.Plan.DeleteProfileCount | Should -Be 0
     }
 
+    It 'does not auto-remediate when the network is degraded and no safe candidate exists' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='LocalNetwork';IPv6Connectivity='NoTraffic'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$false;Http=$false}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $candidate=[pscustomobject]@{KeyName='x';ProfileName='Network 9';RemediationAllowed=$false;IsActive=$true;RiskLevel='High';RiskScore=90;Reason='active'}
+        $diagnostics=[pscustomobject]@{Candidates=@($candidate);NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics
+        $decision.NetworkHealth.Status | Should -Be 'Degraded'
+        $decision.Recommendation | Should -Be 'InvestigateNetwork'
+        $decision.Plan.IsNoOp | Should -BeTrue
+        $decision.Plan.RequiresBackup | Should -BeFalse
+    }
+
+    It 'allows explicit Deep Repair on a non-healthy network when no profile is safely removable' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='LocalNetwork';IPv6Connectivity='NoTraffic'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$false;Http=$false}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $diagnostics=[pscustomobject]@{Candidates=@();NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics -Deep
+        $decision.NetworkHealth.Status | Should -Be 'Degraded'
+        $decision.Recommendation | Should -Be 'InvestigateNetwork'
+        $decision.Plan.IsNoOp | Should -BeFalse
+        $decision.Plan.DeleteProfileCount | Should -Be 0
+        $decision.Plan.ClearNewNetworksRequested | Should -BeTrue
+        $decision.Plan.RequiresBackup | Should -BeTrue
+    }
     It 'rejects invalid network names' {
         (Test-NRNetworkName -Name ('a' * 129)).Valid | Should -BeFalse
         (Test-NRNetworkName -Name 'bad/name').Valid | Should -BeFalse
