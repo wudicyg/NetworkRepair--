@@ -31,11 +31,10 @@
         $entryPath = Join-Path $root 'NetworkRepair.ps1'
         $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
         $content | Should -Match 'Show-NRQuickStatus'
-        $content | Should -Like '*Skipped = $true*'
+        $content | Should -Match ([regex]::Escape('Skipped = $true'))
         $content | Should -Match '快速状态：网络='
         $content | Should -Match '跳过 NCSI 主动探测'
     }
-
     It 'keeps diagnostic degradation warnings visible in the human-readable report' {
         $entryPath = Join-Path $root 'src\Diagnostics.ps1'
         $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
@@ -109,6 +108,17 @@
         $r.RiskLevel | Should -Be 'High'
         $r.RemediationAllowed | Should -BeFalse
         $r.DiagnosticCodes | Should -Contain 'NR1003'
+    }
+
+    It 'keeps sanitized bundle version synchronized with the entry script' {
+        $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
+        $entryPath = Join-Path $root 'NetworkRepair.ps1'
+        $tool = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
+        $entry = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $tool | Should -Match 'entryVersionMatch'
+        $tool | Should -Match 'entryVersionMatch.Groups\[1\]\.Value'
+        $tool | Should -Not -Match "'0.4.0-dev'"
+        $entry | Should -Match '\$Script:AppVersion'
     }
 
     It 'keeps sanitized bundle numbered profile regexes intact' {
