@@ -173,6 +173,23 @@ function Get-NRDiagnostics {
         NCSI = $ncsi
     }
 
+    $numberedProfiles = @($suspects | Where-Object {
+        $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
+    })
+    $profileHygieneStatus = 'Clean'
+    if ($safeCandidates.Count -gt 0) {
+        $profileHygieneStatus = 'HistoricalProfilesFound'
+    } elseif ($numberedProfiles.Count -gt 0) {
+        $profileHygieneStatus = 'ProtectedNumberedProfilesPresent'
+    }
+
+    $repairRecommendation = 'InvestigateNetwork'
+    if ($safeCandidates.Count -gt 0) {
+        $repairRecommendation = 'CleanHistoricalProfiles'
+    } elseif ($networkHealth.Status -eq 'Healthy') {
+        $repairRecommendation = 'NoAction'
+    }
+
     [pscustomobject]@{
         Timestamp = (Get-Date).ToString('o')
         Windows = $windows
@@ -189,6 +206,9 @@ function Get-NRDiagnostics {
         DnsServers = @($dnsServers)
         NCSI = $ncsi
         Connectivity = $connectivity
+        NetworkHealth = $networkHealth
+        ProfileHygieneStatus = $profileHygieneStatus
+        RepairRecommendation = $repairRecommendation
         Issues = @($issueDetails | ForEach-Object Message)
         IssueDetails = @($issueDetails)
         SafeCandidateCount = $safeCandidates.Count
