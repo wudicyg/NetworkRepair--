@@ -18,6 +18,15 @@
         (Get-NRPropertyValue -InputObject $p -Name 'ProfileName') | Should -Be 'Network 9'
     }
 
+    It 'forwards SkipConnectivityTest through interactive menu actions' {
+        $entryPath = Join-Path $root 'NetworkRepair.ps1'
+        $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $content | Should -Match "Invoke-NRScan -SkipConnectivityTest:\$SkipConnectivityTest"
+        $content | Should -Match "Invoke-NRRepair -Deep:\$false -AssumeYes:\$Yes -SkipConnectivityTest:\$SkipConnectivityTest"
+        $content | Should -Match "Invoke-NRRepair -Deep:\$true -AssumeYes:\$Yes -SkipConnectivityTest:\$SkipConnectivityTest"
+        $content | Should -Match "Export-NRReport -SkipConnectivityTest:\$SkipConnectivityTest"
+        $content | Should -Match "Invoke-NRRepair -Deep:\$false -DryRun -AssumeYes:\$false -SkipConnectivityTest:\$SkipConnectivityTest"
+    }
     It 'accepts registry profile input without LastWriteTime metadata' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 9';Category=0;Managed=0;RegistryPath='HKLM:\\dummy'}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
