@@ -191,7 +191,7 @@
     It 'defines only one scoped restore rollback implementation' {
         $path = Join-Path $root 'src\\Backup.ps1'
         $content = Get-Content -LiteralPath $path -Raw -Encoding UTF8
-        ([regex]::Matches($content, 'function Invoke-NRRestoreSafetyRollback\\s*\\{')).Count | Should -Be 1
+        ([regex]::Matches($content, 'function Invoke-NRRestoreSafetyRollback\s*\{')).Count | Should -Be 1
         $content | Should -Not -Match ([regex]::Escape('& reg.exe import $SafetyBackup.RegistryBackup'))
         $content | Should -Match ([regex]::Escape('& reg.exe import $file'))
     }
