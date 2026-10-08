@@ -12,6 +12,12 @@
 - 一键脱敏诊断包导出器，仅保留发布验收和故障排查所需的非敏感摘要。
 - 标准发布包构建器与 Tag 驱动的 GitHub Release 自动化。
 
+### Changed
+- 开发版本 Tag（例如 `v0.4.0-dev`）由 Release 工作流自动标记为 Prerelease，并在创建 Release 前验证 Tag。
+- Release 发布流程补充文档，明确合并 `main` 不会自动创建 GitHub Release。
+- CI 增加 Release 工作流关键安全开关的静态回归检查。
+
+
 ### Fixed
 - 扫描兼容缺失 `LastWriteTime` 的 Registry Provider 对象。
 - NLM COM 不可用时降级为 PowerShell / 注册表诊断，不阻断 Scan。
