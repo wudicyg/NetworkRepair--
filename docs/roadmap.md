@@ -8,6 +8,7 @@
 - [x] 验证与自动回滚
 - [x] JSON 报告
 - [x] Pester + GitHub Actions
+- [x] 发布验证只读证据采集器
 - [ ] Windows 实机矩阵测试
 - [ ] 更多语言环境测试
 
