@@ -29,7 +29,6 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - 默认不会删除当前活动 Profile
 - 默认不会清理 `Signatures\\Managed` / `Signatures\\Unmanaged`
 - 修复前自动创建带时间戳的完整 `NetworkList.reg` 备份，同时保存 Restore 所需的 scoped `Profiles` / `NewNetworks` 快照
-- Dry Run：只显示操作计划，不修改系统
 - 修复后重新扫描并进行连通性验证
 - 验证失败自动尝试回滚
 - JSON 诊断报告
@@ -42,11 +41,11 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - NCSI DNS / HTTP 探测
 - Profile GUID ↔ NetworkId 精确关联
 - 基于 Network List Manager 的显式网络重命名
-- 独立 Repair Planner：统一 Dry Run 与真实修复的操作计划
+- 独立 Repair Planner：统一修复决策与真实执行计划
 - Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
 - Restore 只导入 NetworkRepair 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
-- 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair / Dry Run 前仍执行完整重新诊断
+- 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair 前仍执行完整重新诊断
 
 ## 快速开始
 
@@ -60,7 +59,6 @@ NetworkRepair.bat
 
 ```bat
 NetworkRepair.bat -Mode Scan
-NetworkRepair.bat -Mode DryRun
 NetworkRepair.bat -Mode Repair
 NetworkRepair.bat -Mode DeepRepair
 NetworkRepair.bat -Mode Backup
