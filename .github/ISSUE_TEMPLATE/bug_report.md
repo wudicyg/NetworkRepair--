@@ -10,7 +10,7 @@ assignees: ""
 
 - Windows 版本：
 - PowerShell 版本：
-- NetworkRepair 版本：
+- NetMedic 版本：
 
 ## 问题描述
 
