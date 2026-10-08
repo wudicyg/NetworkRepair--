@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -54,3 +54,45 @@ jobs:
         run: Install-Module Pester -RequiredVersion 5.9.1 -Force -Scope CurrentUser -SkipPublisherCheck
       - name: Run Pester
         run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
+
+  release-package:
+    name: Release package smoke test
+    needs:
+      - powershell-51
+      - powershell-7
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build release package
+        run: |
+          $result = & .\tools\New-NRReleasePackage.ps1 -OutputDirectory .\release-check | ConvertFrom-Json
+          if (-not $result.Success) { throw 'Release package build failed.' }
+          if (-not (Test-Path -LiteralPath $result.Package)) { throw 'Release ZIP was not created.' }
+          if (-not (Test-Path -LiteralPath $result.Sha256)) { throw 'Release SHA-256 file was not created.' }
+
+      - name: Inspect release package contents
+        run: |
+          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
+          $temp = Join-Path $env:TEMP ('NetworkRepairReleaseCheck_' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $temp -Force | Out-Null
+          try {
+            Expand-Archive -LiteralPath $zip.FullName -DestinationPath $temp -Force
+            $root = Get-ChildItem -LiteralPath $temp -Directory | Select-Object -First 1
+            if (-not $root) { throw 'Release package root directory is missing.' }
+            foreach ($required in @('NetworkRepair.bat','NetworkRepair.ps1','README.md','LICENSE','CHANGELOG.md','src','docs','tools','RELEASE-MANIFEST.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $root.FullName $required))) {
+                throw "Required release content missing: $required"
+              }
+            }
+            foreach ($forbidden in @('tests','.git','.github','backups','logs','reports')) {
+              if (Test-Path -LiteralPath (Join-Path $root.FullName $forbidden)) {
+                throw "Forbidden runtime/development content included: $forbidden"
+              }
+            }
+          } finally {
+            Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+          }
