@@ -93,6 +93,38 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\New-NRReleasePackage.ps1
 NetworkRepair.bat -Mode Scan -SkipConnectivityTest
 ```
 
+
+## 发布流程
+
+GitHub Release 不会因为合并到 `main` 自动产生；只有推送与 `NetworkRepair.ps1` 版本完全一致的 Tag 后，Release 工作流才会创建发行版。
+
+当前开发版为：
+
+```text
+0.4.0-dev
+```
+
+开发/预发布版本可使用：
+
+```powershell
+git tag v0.4.0-dev
+git push origin v0.4.0-dev
+```
+
+带 `-` 的版本会被 GitHub Actions 发布为 **Prerelease**。正式稳定版则应先把脚本版本更新为不带预发布后缀的版本，例如：
+
+```text
+0.4.0
+```
+
+然后：
+
+```powershell
+git tag v0.4.0
+git push origin v0.4.0
+```
+
+Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。正式版发布前仍应完成 [Windows 10 / 11 发布验证](docs/release-validation.md) 中的实机矩阵。
 ## 安全模型
 
 ### Safe Repair
