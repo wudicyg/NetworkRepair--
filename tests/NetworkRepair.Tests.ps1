@@ -27,6 +27,15 @@
         $content | Should -Match 'Export-NRReport -SkipConnectivityTest:\$SkipConnectivityTest'
         $content | Should -Match 'Invoke-NRRepair -Deep:\$false -DryRun -AssumeYes:\$false -SkipConnectivityTest:\$SkipConnectivityTest'
     }
+    It 'shows the read-only quick status in the interactive menu' {
+        $entryPath = Join-Path $root 'NetworkRepair.ps1'
+        $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $content | Should -Match 'Show-NRQuickStatus'
+        $content | Should -Match 'Skipped = \\$true'
+        $content | Should -Match '快速状态：网络='
+        $content | Should -Match '跳过 NCSI 主动探测'
+    }
+
     It 'keeps diagnostic degradation warnings visible in the human-readable report' {
         $entryPath = Join-Path $root 'src\Diagnostics.ps1'
         $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
