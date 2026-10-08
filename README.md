@@ -110,18 +110,7 @@ git tag v0.4.0
 git push origin v0.4.0
 ```
 
-发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本再使用带预发布后缀的版本号，例如：
-
-```text
-0.4.0
-```
-
-然后：
-
-```powershell
-git tag v0.4.0
-git push origin v0.4.0
-```
+发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本使用新的开发版本号，例如 `0.4.1-dev`。
 
 Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。当前版本以 Windows 10 实机核心场景为主要行为证据，Windows 11 与更多环境组合属于后续扩展验证。
 ## 安全模型
@@ -136,7 +125,7 @@ Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 P
 
 ### Deep Repair
 
-在 Safe Repair 基础上刷新 `NewNetworks`。当前开发版 **不会**无条件删除 `Signatures\\Managed` / `Signatures\\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
+在 Safe Repair 基础上刷新 `NewNetworks`。当前稳定版 **不会**无条件删除 `Signatures\\Managed` / `Signatures\\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
 
 ## 备份
 
