@@ -48,6 +48,8 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - 多级恢复点：备份按 `Manual` / `PreRepair` / `PreRestore` 分级，可列举、按序号恢复、固定保护，并按保留额度显式清理
 - 按需服务刷新：仅在 `NetworkList` 范围真实改动后，按依赖顺序刷新 `NlaSvc` / `netprofm`，有界等待服务与 Network List Manager COM 恢复可用，并把刷新结果回传到修复、恢复与重命名结果
 - 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair 前仍执行完整重新诊断
+- 图形界面（WinForms）：五张状态卡 + 一键操作按钮 + 带颜色的运行日志；修复前展示计划并要求确认
+- 窗口化单文件主程序：双击直接进界面，无控制台窗口；控制台菜单与命令行参数仍通过 `备用启动` 与脚本可用
 
 ## 快速开始
 
@@ -57,8 +59,9 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 
 - **`NetworkRepair-<版本>-Portable.exe`**：主程序本身，下载后直接双击，不用解压。
 - **`NetworkRepair_<版本>_Windows.zip`**：完整发布包，解压后双击里面的 `网络修复工具.exe`（同一个程序）。
+- 打开后是**图形界面**：顶部五张状态卡 + 一键操作按钮，点修复前会先展示本次修复计划并要求确认。
 - 首次运行会弹出「用户账户控制」，选择「是」——本工具需要管理员权限才能读写网络配置。
-- 若 exe 被安全软件拦截，改用 `备用启动\启动-网络修复工具.bat`，效果完全相同。
+- 若 exe 被安全软件拦截，改用 `备用启动\启动-网络修复工具.bat`（打开的是控制台菜单版），功能完全相同。
 - 完整操作说明见 [使用说明.md](使用说明.md)。
 
 > 发布页附件名使用 ASCII：GitHub 会剥掉附件名中的中文字符，因此中文名称以附件标签展示，包内入口仍是中文名。
@@ -227,7 +230,8 @@ NetworkRepair/
 │  ├─ RestorePoints.ps1
 │  ├─ Services.ps1
 │  ├─ Repair.ps1
-│  └─ Validation.ps1
+│  ├─ Validation.ps1
+│  └─ Gui.ps1
 ├─ tests/
 │  └─ NetworkRepair.Tests.ps1
 ├─ tools/
