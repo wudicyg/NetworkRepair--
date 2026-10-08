@@ -32,9 +32,9 @@ function ConvertTo-NRSanitizedCandidate {
     param([Parameter(Mandatory)]$Candidate)
 
     $profileClass = 'Other'
-    if ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^网络s+d+$') {
+    if ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^网络\s+\d+$') {
         $profileClass = 'ChineseNumbered'
-    } elseif ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^Networks+d+$') {
+    } elseif ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^Network\s+\d+$') {
         $profileClass = 'EnglishNumbered'
     }
 
@@ -76,7 +76,7 @@ function Export-NRSanitizedDiagnosticBundle {
         SafeCandidateCount = [int]$diagnostics.SafeCandidateCount
         HighRiskCount = [int]$diagnostics.HighRiskCount
         NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
-            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)s+d+$'
+            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
         }).Count
         CurrentConnections = @($diagnostics.Connections | ForEach-Object {
             [pscustomobject]@{
