@@ -49,6 +49,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - 按需服务刷新：仅在 `NetworkList` 范围真实改动后，按依赖顺序刷新 `NlaSvc` / `netprofm`，有界等待服务与 Network List Manager COM 恢复可用，并把刷新结果回传到修复、恢复与重命名结果
 - 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair 前仍执行完整重新诊断
 - 图形界面（WinForms）：五张状态卡 + 一键操作按钮 + 带颜色的运行日志；修复前展示计划并要求确认
+- 更新检查：命令行 `-Mode CheckUpdate` 与界面「检查更新」按钮；只检查与告知，不自动下载或替换自身
 - 窗口化单文件主程序：双击直接进界面，无控制台窗口；控制台菜单与命令行参数仍通过 `备用启动` 与脚本可用
 
 ## 快速开始
@@ -83,6 +84,8 @@ NetworkRepair.bat -Mode DeepRepair
 NetworkRepair.bat -Mode Backup
 NetworkRepair.bat -Mode Report
 NetworkRepair.bat -Mode Rename -NetworkId "{GUID}" -NewName "Office"
+NetworkRepair.bat -Mode CheckUpdate
+NetworkRepair.bat -Mode CheckUpdate -Json
 ```
 
 JSON：
@@ -231,6 +234,7 @@ NetworkRepair/
 │  ├─ Services.ps1
 │  ├─ Repair.ps1
 │  ├─ Validation.ps1
+│  ├─ Update.ps1
 │  └─ Gui.ps1
 ├─ tests/
 │  └─ NetworkRepair.Tests.ps1
