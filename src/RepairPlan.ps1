@@ -100,7 +100,12 @@ function Get-NRRepairDecision {
         [switch]$Deep
     )
 
-    $plan = Get-NRRepairPlan -Candidates $Diagnostics.Candidates -Deep:$Deep
+    $safeCandidates = @($Diagnostics.Candidates | Where-Object { $_ -and $_.RemediationAllowed })
+    $deepAllowed = [bool]$Deep -and (
+        $Diagnostics.NetworkHealth.Status -ne 'Healthy' -or
+        $safeCandidates.Count -gt 0
+    )
+    $plan = Get-NRRepairPlan -Candidates $Diagnostics.Candidates -Deep:$deepAllowed
     $numberedProfiles = @($Diagnostics.Candidates | Where-Object {
         $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
     })
