@@ -4,7 +4,7 @@
 
 > 当前稳定版本：**0.2.0**
 
-开发分支：**0.3.0-dev**
+当前主分支：**0.3.0-dev（已合并 v0.3 Network Identity / Rename 能力，待实机验证）**
 
 NetworkRepair 的目标不是“暴力清理注册表”，而是：
 
@@ -48,6 +48,7 @@ NetworkRepair.bat -Mode Repair
 NetworkRepair.bat -Mode DeepRepair
 NetworkRepair.bat -Mode Backup
 NetworkRepair.bat -Mode Report
+NetworkRepair.bat -Mode Rename -NetworkId "{GUID}" -NewName "Office"
 ```
 
 JSON：
@@ -113,6 +114,9 @@ NetworkRepair/
 ├─ src/
 │  ├─ Common.ps1
 │  ├─ Diagnostics.ps1
+│  ├─ NetworkListManager.ps1
+│  ├─ NetworkIdentity.ps1
+│  ├─ Ncsi.ps1
 │  ├─ Backup.ps1
 │  ├─ Repair.ps1
 │  └─ Validation.ps1
@@ -144,15 +148,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-后续版本计划加入：
-
-- 更完整的 Network List Manager COM 诊断
-- 网络名称安全重命名
-- DNS / DHCP / TCP/IP / NCSI 诊断
-- 更细的风险评分
-- 更丰富的恢复点管理
-- CI 自动测试
-- GUI 前端
+当前 `main` 已包含 v0.3 的 Network Identity / 安全重命名能力，但正式稳定版仍需完成 Windows 10 / 11 实机矩阵、更多语言环境和发布包验证。后续重点是恢复点增强、诊断包导出与用户体验。
 
 ## License
 
