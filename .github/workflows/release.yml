@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: networkrepair-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify tag matches application version
+        run: |
+          $content = Get-Content .\NetworkRepair.ps1 -Raw -Encoding UTF8
+          $match = [regex]::Match($content, "\$Script:AppVersion\s*=\s*'([^']+)'")
+          if (-not $match.Success) { throw 'Unable to determine application version.' }
+          $version = $match.Groups[1].Value
+          $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
+          if ($tagVersion -ne $version) {
+            throw "Tag version $tagVersion does not match application version $version."
+          }
+          Write-Host "Release version: $version"
+
+      - name: Install Pester
+        run: Install-Module Pester -RequiredVersion 5.9.1 -Force -Scope CurrentUser -SkipPublisherCheck
+
+      - name: Run Pester
+        run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
+
+      - name: Build release package
+        run: |
+          $result = & .\tools\New-NRReleasePackage.ps1 -OutputDirectory .\release | ConvertFrom-Json
+          if (-not $result.Success) { throw 'Release package build failed.' }
+          Write-Host "Package: $($result.Package)"
+          Write-Host "SHA256: $($result.Sha256Value)"
+
+      - name: Upload release package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetworkRepair-${{ github.ref_name }}
+          path: |
+            release/*.zip
+            release/*.sha256
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        run: |
+          $zip = Get-ChildItem .\release\*.zip | Select-Object -First 1
+          $sha = Get-ChildItem .\release\*.sha256 | Select-Object -First 1
+          if (-not $zip -or -not $sha) { throw 'Release artifacts not found.' }
+          gh release create "$env:GITHUB_REF_NAME" "$($zip.FullName)" "$($sha.FullName)" --title "NetworkRepair $env:GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
