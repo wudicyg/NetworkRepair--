@@ -407,6 +407,13 @@ function Show-NRDiagnostics {
         }
     }
 
+    if (@($Diagnostics.DiagnosticsErrors).Count -gt 0) {
+        Write-NRSection '诊断降级提示'
+        Write-NRLine ('有 {0} 个诊断阶段未能完整读取；以上结论应结合日志谨慎解读。' -f @($Diagnostics.DiagnosticsErrors).Count) 'Yellow'
+        foreach ($errorItem in @($Diagnostics.DiagnosticsErrors)) {
+            Write-NRLine ('[DEGRADED] {0}' -f $errorItem) 'Yellow'
+        }
+    }
     Write-NRSection '结论'
     if ($Diagnostics.IssueDetails.Count -eq 0) {
         Write-NRLine '当前没有发现明显网络故障。' 'Green'

@@ -27,6 +27,13 @@
         $content | Should -Match 'Export-NRReport -SkipConnectivityTest:\$SkipConnectivityTest'
         $content | Should -Match 'Invoke-NRRepair -Deep:\$false -DryRun -AssumeYes:\$false -SkipConnectivityTest:\$SkipConnectivityTest'
     }
+    It 'keeps diagnostic degradation warnings visible in the human-readable report' {
+        $entryPath = Join-Path $root 'src\Diagnostics.ps1'
+        $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $content | Should -Match "Write-NRSection '诊断降级提示'"
+        $content | Should -Match '\[DEGRADED\]'
+        $content | Should -Match 'DiagnosticsErrors'
+    }
     It 'accepts registry profile input without LastWriteTime metadata' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 9';Category=0;Managed=0;RegistryPath='HKLM:\\dummy'}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
