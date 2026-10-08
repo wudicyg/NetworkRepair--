@@ -79,6 +79,14 @@ NetworkRepair.bat -Mode Scan -Json
 powershell.exe -ExecutionPolicy Bypass -File .\tools\Export-NRSanitizedDiagnosticBundle.ps1
 ```
 
+构建发布包（开发者/维护者）：
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\New-NRReleasePackage.ps1
+```
+
+发布包由带 `v` 前缀的版本 Tag 触发 GitHub Actions 自动构建，并生成 ZIP 与 SHA-256 校验文件。发布 Tag 必须与 `NetworkRepair.ps1` 中的版本完全一致。
+
 跳过 Internet/DNS 测试：
 
 ```bat
@@ -146,7 +154,9 @@ NetworkRepair/
 ├─ tests/
 │  └─ NetworkRepair.Tests.ps1
 ├─ tools/
-│  └─ Invoke-NRReadOnlyValidation.ps1
+│  ├─ Invoke-NRReadOnlyValidation.ps1
+│  ├─ Export-NRSanitizedDiagnosticBundle.ps1
+│  └─ New-NRReleasePackage.ps1
 ├─ docs/
 ├─ backups/
 ├─ logs/
