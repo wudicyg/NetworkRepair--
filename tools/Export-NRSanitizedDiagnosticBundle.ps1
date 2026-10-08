@@ -10,7 +10,9 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Src = Join-Path $Root 'src'
 
 $Script:AppName = 'NetworkRepair'
-$Script:AppVersion = '0.4.0-dev'
+$entryVersionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $Root 'NetworkRepair.ps1') -Raw -Encoding UTF8), '\$Script:AppVersion\s*=\s*''([^'']+)''')
+if (-not $entryVersionMatch.Success) { throw 'Unable to determine NetworkRepair version from NetworkRepair.ps1.' }
+$Script:AppVersion = $entryVersionMatch.Groups[1].Value
 $Script:Root = $Root
 $Script:Src = $Src
 $Script:Backups = Join-Path $Root 'backups'
