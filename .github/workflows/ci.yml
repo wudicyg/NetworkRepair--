@@ -97,6 +97,36 @@ jobs:
             Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
           }
 
+      - name: Verify release package checksum
+        run: |
+          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
+          $shaFile = Get-ChildItem .\release-check\*.sha256 | Select-Object -First 1
+          if (-not $zip -or -not $shaFile) { throw 'Release package checksum inputs are missing.' }
+          $expectedLine = (Get-Content -LiteralPath $shaFile.FullName -Raw -Encoding ASCII).Trim()
+          if ($expectedLine -notmatch '^([0-9a-fA-F]{64})[ 	]+(.+)        run: |
+          if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern 'RELEASE_IS_PRERELEASE' -Quiet)) {
+            throw 'Release workflow prerelease detection is missing.'
+          }
+          if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern '--prerelease' -Quiet)) {
+            throw 'Release workflow prerelease publishing guard is missing.'
+          }
+          if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern '--verify-tag' -Quiet)) {
+            throw 'Release workflow tag verification is missing.'
+          }
+) {
+            throw 'Release SHA-256 file format is invalid.'
+          }
+          $expectedHash = $matches[1].ToLowerInvariant()
+          $expectedName = $matches[2].Trim()
+          if ($expectedName -ne $zip.Name) {
+            throw "Checksum filename does not match ZIP name: $expectedName"
+          }
+          $actualHash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "Release SHA-256 mismatch. Expected $expectedHash, actual $actualHash."
+          }
+          Write-Host "Release SHA-256 verified: $actualHash"
+
       - name: Validate release workflow safety
         run: |
           if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern 'RELEASE_IS_PRERELEASE' -Quiet)) {
