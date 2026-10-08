@@ -10,6 +10,14 @@
         . (Join-Path $root 'src\Backup.ps1')
     }
 
+    It 'accepts registry profile input without LastWriteTime metadata' {
+        $p=[pscustomobject]@{KeyName='x';ProfileName='网络 9';Category=0;Managed=0;RegistryPath='HKLM:\\dummy'}
+        $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
+        $r.RiskLevel | Should -Be 'Low'
+        $r.RemediationAllowed | Should -BeTrue
+        $r.LastWrite | Should -BeNullOrEmpty
+    }
+
     It 'marks an inactive Chinese numbered profile as Low and removable' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 3';Category=0;Managed=0;RegistryPath='HKLM:\dummy';LastWrite=(Get-Date)}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
