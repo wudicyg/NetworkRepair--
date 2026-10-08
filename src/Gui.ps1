@@ -198,7 +198,7 @@ function New-NRGuiStatusCard {
 function Get-NRGuiApplicationIcon {
     <#
         窗口与任务栏图标：打包成 exe 时用 exe 自身的图标；以脚本方式运行时退回包内的
-        assets\NetworkRepair.ico。两条路都拿不到就返回 $null（用系统默认图标）。
+        assets\NetMedic.ico。两条路都拿不到就返回 $null（用系统默认图标）。
     #>
     $isScriptHost = [bool](Get-Variable -Name 'ScriptHost' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
     if (-not $isScriptHost) {
@@ -213,7 +213,7 @@ function Get-NRGuiApplicationIcon {
     try {
         $root = [string](Get-Variable -Name 'Root' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
         if ($root) {
-            $candidate = Join-Path $root 'assets\NetworkRepair.ico'
+            $candidate = Join-Path $root 'assets\NetMedic.ico'
             if (Test-Path -LiteralPath $candidate) { return (New-Object System.Drawing.Icon($candidate)) }
         }
     } catch { }
@@ -224,8 +224,8 @@ function New-NRGuiForm {
     Initialize-NRGuiAssemblies
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Name = 'NetworkRepairGuiForm'
-    $form.Text = ('NetworkRepair 网络修复工具 v{0}' -f $Script:AppVersion)
+    $form.Name = 'NetMedicGuiForm'
+    $form.Text = ('NetMedic 网络医生 v{0}' -f $Script:AppVersion)
     $form.Size = New-Object System.Drawing.Size(980, 700)
     $form.MinimumSize = New-Object System.Drawing.Size(900, 620)
     $form.StartPosition = 'CenterScreen'
@@ -257,7 +257,7 @@ function New-NRGuiForm {
     $titleLabel.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 14, [System.Drawing.FontStyle]::Bold)
     $titleLabel.TextAlign = 'MiddleLeft'
     $titleLabel.Padding = New-Object System.Windows.Forms.Padding(14, 0, 0, 0)
-    $titleLabel.Text = ('  NetworkRepair 网络修复工具   v{0}' -f $Script:AppVersion)
+    $titleLabel.Text = ('  NetMedic 网络医生   v{0}' -f $Script:AppVersion)
     [void]$header.Controls.Add($titleLabel)
 
     # 状态卡
@@ -458,7 +458,7 @@ function Invoke-NRGuiOperation {
         & $Action @ArgumentList
     } catch {
         Write-NRGuiLog -Message ('操作失败：{0}' -f $_.Exception.Message) -Kind 'Error'
-        [void][System.Windows.Forms.MessageBox]::Show(('操作失败：' + "`r`n`r`n" + $_.Exception.Message), 'NetworkRepair', 'OK', 'Error')
+        [void][System.Windows.Forms.MessageBox]::Show(('操作失败：' + "`r`n`r`n" + $_.Exception.Message), 'NetMedic', 'OK', 'Error')
     } finally {
         $timer.Stop()
         $timer.Dispose()
@@ -517,7 +517,7 @@ function Invoke-NRGuiRepair {
         Update-NRGuiStatusCards -Diagnostics $diagnostics -RestorePointSummary $snapshot.RestorePointSummary
         [void][System.Windows.Forms.MessageBox]::Show(
             ("当前无需修复。" + "`r`n`r`n" + "网络健康状态：" + $diagnostics.NetworkHealth.Status + "`r`n" + $diagnostics.NetworkHealth.Reason),
-            'NetworkRepair', 'OK', 'Information')
+            'NetMedic', 'OK', 'Information')
         return
     }
 
@@ -543,13 +543,13 @@ function Invoke-NRGuiRepair {
         if ($validation) {
             Write-NRGuiLog -Message ('修复后验证：{0}；网络健康：{1}' -f $(if ($validation.Success) { '通过' } else { '未通过' }), $validation.Diagnostics.NetworkHealth.Status) -Kind $(if ($validation.Success) { 'Ok' } else { 'Error' })
         }
-        [void][System.Windows.Forms.MessageBox]::Show(('修复完成，已删除 ' + $result.Changed + ' 个历史 Profile，修改前已自动创建恢复点。'), 'NetworkRepair', 'OK', 'Information')
+        [void][System.Windows.Forms.MessageBox]::Show(('修复完成，已删除 ' + $result.Changed + ' 个历史 Profile，修改前已自动创建恢复点。'), 'NetMedic', 'OK', 'Information')
     } else {
         Write-NRGuiLog -Message ('修复失败：{0}' -f $result.Error) -Kind 'Error'
         if ($result.Rollback) {
             Write-NRGuiLog -Message ('自动回滚：{0}' -f $(if ($result.Rollback.Success) { '成功，已恢复到修改前状态' } else { '失败：' + $result.Rollback.Error })) -Kind $(if ($result.Rollback.Success) { 'Warn' } else { 'Error' })
         }
-        [void][System.Windows.Forms.MessageBox]::Show(('修复失败：' + "`r`n`r`n" + $result.Error), 'NetworkRepair', 'OK', 'Error')
+        [void][System.Windows.Forms.MessageBox]::Show(('修复失败：' + "`r`n`r`n" + $result.Error), 'NetMedic', 'OK', 'Error')
     }
 
     [void](Update-NRGuiFromDiagnostics)
@@ -560,14 +560,14 @@ function Invoke-NRGuiBackup {
     $backup = New-NRBackup -Level 'Manual'
     Write-NRGuiLog -Message ('恢复点已创建：{0}' -f $backup.Path) -Kind 'Ok'
     [void](Update-NRGuiFromDiagnostics)
-    [void][System.Windows.Forms.MessageBox]::Show(('恢复点已创建：' + "`r`n" + $backup.Path), 'NetworkRepair', 'OK', 'Information')
+    [void][System.Windows.Forms.MessageBox]::Show(('恢复点已创建：' + "`r`n" + $backup.Path), 'NetMedic', 'OK', 'Information')
 }
 
 function Invoke-NRGuiExportReport {
     Write-NRGuiLog -Message '正在导出脱敏诊断报告…' -Kind 'Head'
     $report = Export-NRReport -SkipConnectivityTest
     Write-NRGuiLog -Message ('报告已导出：{0}' -f $report.Path) -Kind 'Ok'
-    [void][System.Windows.Forms.MessageBox]::Show(('诊断报告已导出（已脱敏）：' + "`r`n" + $report.Path), 'NetworkRepair', 'OK', 'Information')
+    [void][System.Windows.Forms.MessageBox]::Show(('诊断报告已导出（已脱敏）：' + "`r`n" + $report.Path), 'NetMedic', 'OK', 'Information')
 }
 
 function Invoke-NRGuiUpdateCheck {
@@ -709,8 +709,8 @@ function Show-NRGuiRestorePointDialog {
     # 操作体通过 -ArgumentList 显式接收所需变量，避免依赖脚本块的作用域继承。
     $buttons.Controls['btnRestore'].Add_Click({
         $point = & $selectedPoint
-        if (-not $point) { [void][System.Windows.Forms.MessageBox]::Show('请先在列表中选择一个恢复点。', 'NetworkRepair', 'OK', 'Information'); return }
-        if (-not $point.IsIntact) { [void][System.Windows.Forms.MessageBox]::Show('所选恢复点完整性异常，已拒绝使用。', 'NetworkRepair', 'OK', 'Error'); return }
+        if (-not $point) { [void][System.Windows.Forms.MessageBox]::Show('请先在列表中选择一个恢复点。', 'NetMedic', 'OK', 'Information'); return }
+        if (-not $point.IsIntact) { [void][System.Windows.Forms.MessageBox]::Show('所选恢复点完整性异常，已拒绝使用。', 'NetMedic', 'OK', 'Error'); return }
         $answer = [System.Windows.Forms.MessageBox]::Show(('即将从恢复点 [' + $point.Index + '] ' + $point.Name + ' 恢复。' + "`r`n`r`n" + '确认继续吗？'), '确认恢复', 'YesNo', 'Warning')
         if ($answer -ne 'Yes') { return }
         Invoke-NRGuiOperation -StatusText '正在恢复…' -ArgumentList @($point, $refresh) -Action {
@@ -728,7 +728,7 @@ function Show-NRGuiRestorePointDialog {
 
     $buttons.Controls['btnPin'].Add_Click({
         $point = & $selectedPoint
-        if (-not $point) { [void][System.Windows.Forms.MessageBox]::Show('请先在列表中选择一个恢复点。', 'NetworkRepair', 'OK', 'Information'); return }
+        if (-not $point) { [void][System.Windows.Forms.MessageBox]::Show('请先在列表中选择一个恢复点。', 'NetMedic', 'OK', 'Information'); return }
         Invoke-NRGuiOperation -StatusText '正在更新固定标记…' -ArgumentList @($point, $refresh) -Action {
             param($point, $refresh)
             $result = Set-NRRestorePointPin -Path $point.Path -Pinned:(-not $point.Pinned)
@@ -740,7 +740,7 @@ function Show-NRGuiRestorePointDialog {
     $buttons.Controls['btnPrune'].Add_Click({
         $plan = Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints)
         if ($plan.RemoveCount -eq 0) {
-            [void][System.Windows.Forms.MessageBox]::Show('没有超出保留额度的恢复点，无需清理。', 'NetworkRepair', 'OK', 'Information')
+            [void][System.Windows.Forms.MessageBox]::Show('没有超出保留额度的恢复点，无需清理。', 'NetMedic', 'OK', 'Information')
             return
         }
         $lines = @($plan.Remove | ForEach-Object { '  · [{0}] {1}  {2}' -f $_.Index, $_.Created.ToString('yyyy-MM-dd HH:mm:ss'), $_.Name })
@@ -805,11 +805,11 @@ function Show-NRGui {
         CheckUpdate = { Invoke-NRGuiOperation -StatusText '正在检查更新…' -Action { [void](Invoke-NRGuiUpdateCheck) } }
         About = {
             [void][System.Windows.Forms.MessageBox]::Show(
-                ('NetworkRepair v' + $Script:AppVersion + "`r`n`r`n" +
+                ('NetMedic v' + $Script:AppVersion + "`r`n`r`n" +
                  'Windows 网络配置诊断与修复工具' + "`r`n" +
                  '安全原则：先诊断 → 先备份 → 再修改 → 最后验证' + "`r`n`r`n" +
                  '高级用户仍可使用命令行版本（备用启动目录中的批处理或 NetworkRepair.single.ps1）。'),
-                '关于 NetworkRepair', 'OK', 'Information')
+                '关于 NetMedic', 'OK', 'Information')
         }
     }
 
@@ -819,7 +819,7 @@ function Show-NRGui {
     }
 
     $form.Add_Shown({
-        Write-NRGuiLog -Message ('NetworkRepair v{0} 已启动。' -f $Script:AppVersion) -Kind 'Head'
+        Write-NRGuiLog -Message ('NetMedic v{0} 已启动。' -f $Script:AppVersion) -Kind 'Head'
         Write-NRGuiLog -Message '安全原则：先诊断 → 先备份 → 再修改 → 最后验证。'
         Invoke-NRGuiOperation -StatusText '正在执行首次诊断…' -Action {
             $snapshot = Update-NRGuiFromDiagnostics
