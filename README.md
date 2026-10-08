@@ -2,12 +2,14 @@
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
-> 当前稳定版本：**0.2.0**
+> 当前开发版本：**0.4.0-dev**
+>
+> `0.4.0-dev` 已完成核心 Safe Repair 实机验证；正式稳定版仍以 Windows 10/11 多版本矩阵与发布验收为准。
 
 > **项目定位**：专门解决 Windows 网络名称持续出现「网络 2 / 网络 3 / 网络 4 / …」等历史 Network Profile 累积问题。  
 > 在不破坏当前活动网络的前提下，先诊断、再备份、后清理并验证；同时提供 DNS、DHCP、网关、NCSI 等常见网络故障诊断与可回滚修复能力。
 
-当前主分支：**0.4.0-dev（已合并 Repair Planner 与 Restore 快照校验能力，待实机验证）**
+当前主分支：**0.4.0-dev**
 
 NetworkRepair 的目标不是“暴力清理注册表”，而是：
 
@@ -89,7 +91,7 @@ NetworkRepair.bat -Mode Scan -SkipConnectivityTest
 
 ### Deep Repair
 
-在 Safe Repair 基础上刷新 `NewNetworks`。v0.2.0 **不会**无条件删除 `Signatures\Managed` / `Signatures\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
+在 Safe Repair 基础上刷新 `NewNetworks`。当前开发版 **不会**无条件删除 `Signatures\Managed` / `Signatures\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
 
 ## 备份
 
@@ -166,7 +168,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-当前 `main` 已包含 v0.4 的 Repair Planner、Restore 快照校验和“网络健康 / Profile 历史遗留”双轨判定。正式稳定版仍需完成 Windows 10 / 11 实机矩阵、更多语言环境和发布包验证。后续重点是 TUI 增强、脱敏诊断包和多级恢复点。
+当前 `main` 已包含 v0.4 的 Repair Planner、Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读发布验收证据采集，以及 Safe Repair 执行过程反馈。正式稳定版仍需完成 Windows 10 / 11 多版本实机矩阵、更多语言环境与发布包验证。后续重点是 TUI 增强、脱敏诊断包和多级恢复点。
 
 ## License
 
