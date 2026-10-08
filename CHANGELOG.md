@@ -1,5 +1,13 @@
 ﻿# Changelog
 
+## Unreleased
+
+### Changed
+- 明确 Issues 与 Discussions 的分工：新增协作流程文档 `docs/collaboration.md`，Issue 模板页增加 Q&A / Ideas / 私密安全报告入口，`CONTRIBUTING.md` 补充分支命名与 PR 门禁。
+
+### Fixed
+- 删除 `.github/pull_request_template.md`：它与 `.github/PULL_REQUEST_TEMPLATE.md` 仅大小写不同，在 Windows 上检出会产生文件冲突，且内容仍在引用 1.0.0 已移除的 Dry Run。
+
 ## [1.0.0] - 2026-10-08
 
 ### Release
