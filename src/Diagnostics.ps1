@@ -190,7 +190,10 @@ function Get-NRDiagnostics {
         NCSI = $ncsi
         Connectivity = $connectivity
         NetworkHealth = $networkHealth
-        ProfileHygieneStatus = if ($safeCandidates.Count) { 'HistoricalProfilesFound' } elseif (@($suspects | Where-Object { $_.ProfileName -match '^(网络|Network)\s+\d+
+        ProfileHygieneStatus = if ($safeCandidates.Count -gt 0) {
+            'HistoricalProfilesFound'
+        } elseif (@($suspects | Where-Object {
+            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+
         IssueDetails = @($issueDetails)
         SafeCandidateCount = $safeCandidates.Count
         HighRiskCount = $highRisk.Count
@@ -248,8 +251,19 @@ function Show-NRDiagnostics {
     else { foreach ($i in $Diagnostics.IssueDetails) { Write-NRLine ('[{0}] {1}' -f $i.Code, $i.Message) 'Yellow' } }
 }
 
- }).Count) { 'ProtectedNumberedProfilesPresent' } else { 'Clean' }
-        RepairRecommendation = if ($safeCandidates.Count) { 'CleanHistoricalProfiles' } elseif ($networkHealth.Status -eq 'Healthy') { 'NoAction' } else { 'InvestigateNetwork' }
+
+        }).Count -gt 0) {
+            'ProtectedNumberedProfilesPresent'
+        } else {
+            'Clean'
+        }
+        RepairRecommendation = if ($safeCandidates.Count -gt 0) {
+            'CleanHistoricalProfiles'
+        } elseif ($networkHealth.Status -eq 'Healthy') {
+            'NoAction'
+        } else {
+            'InvestigateNetwork'
+        }
         Issues = @($issueDetails | ForEach-Object Message)
         IssueDetails = @($issueDetails)
         SafeCandidateCount = $safeCandidates.Count
