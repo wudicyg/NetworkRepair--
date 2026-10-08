@@ -46,6 +46,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - Restore 只导入 NetworkRepair 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
 - 多级恢复点：备份按 `Manual` / `PreRepair` / `PreRestore` 分级，可列举、按序号恢复、固定保护，并按保留额度显式清理
+- 按需服务刷新：仅在 `NetworkList` 范围真实改动后，按依赖顺序刷新 `NlaSvc` / `netprofm`，有界等待服务与 Network List Manager COM 恢复可用，并把刷新结果回传到修复、恢复与重命名结果
 - 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair 前仍执行完整重新诊断
 
 ## 快速开始
@@ -209,6 +210,8 @@ NetworkRepair/
 │  ├─ RepairPlan.ps1
 │  ├─ Ncsi.ps1
 │  ├─ Backup.ps1
+│  ├─ RestorePoints.ps1
+│  ├─ Services.ps1
 │  ├─ Repair.ps1
 │  └─ Validation.ps1
 ├─ tests/
