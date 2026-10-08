@@ -6,6 +6,7 @@
         . (Join-Path $root 'src\NetworkIdentity.ps1')
         . (Join-Path $root 'src\Ncsi.ps1')
         . (Join-Path $root 'src\Diagnostics.ps1')
+        . (Join-Path $root 'src\Backup.ps1')
     }
 
     It 'marks an inactive Chinese numbered profile as Low and removable' {
@@ -75,6 +76,32 @@
         $r.IsActive | Should -BeTrue
         $r.RemediationAllowed | Should -BeFalse
         $r.DiagnosticCodes | Should -Contain 'NR1002'
+    }
+
+    It 'compares registry snapshots canonically across ordering and registry-name casing' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_test_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            $a=Join-Path $dir 'a.reg';$b=Join-Path $dir 'b.reg'
+            @('Windows Registry Editor Version 5.00','[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles]','"Name"="Office"','"Blob"=hex:01,02,\','03,04') | Set-Content -LiteralPath $a -Encoding UTF8
+            @('Windows Registry Editor Version 5.00','[hkey_local_machine\software\microsoft\windows nt\currentversion\networklist\profiles]','"blob"=hex:01,02,\','03,04','"NAME"="Office"') | Set-Content -LiteralPath $b -Encoding UTF8
+            $r=Compare-NRRegSnapshotFiles -ExpectedPath $a -ActualPath $b
+            $r.Match | Should -BeTrue
+            $r.ExpectedHash | Should -Be $r.ActualHash
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'detects registry snapshot data differences' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_test_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            $a=Join-Path $dir 'a.reg';$b=Join-Path $dir 'b.reg'
+            @('[HKEY_LOCAL_MACHINE\SOFTWARE\NetworkRepair]','"Name"="Office"') | Set-Content -LiteralPath $a -Encoding UTF8
+            @('[HKEY_LOCAL_MACHINE\SOFTWARE\NetworkRepair]','"Name"="Home"') | Set-Content -LiteralPath $b -Encoding UTF8
+            $r=Compare-NRRegSnapshotFiles -ExpectedPath $a -ActualPath $b
+            $r.Match | Should -BeFalse
+            $r.Differences.Count | Should -BeGreaterThan 0
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
     }
 
     It 'rejects invalid network names' {
