@@ -1,8 +1,9 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','Report','Rename','Version')]
+    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','RestorePoints','Prune','Report','Rename','Version')]
     [string]$Mode = 'Menu',
     [string]$BackupPath,
+    [int]$RestorePointIndex = 0,
     [string]$ReportPath,
     [string]$NetworkId,
     [string]$NewName,
@@ -27,6 +28,7 @@ $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'RepairPlan.ps1')
 . (Join-Path $Script:Src 'Ncsi.ps1')
 . (Join-Path $Script:Src 'Backup.ps1')
+. (Join-Path $Script:Src 'RestorePoints.ps1')
 . (Join-Path $Script:Src 'Repair.ps1')
 . (Join-Path $Script:Src 'Validation.ps1')
 Initialize-NRPaths
@@ -106,7 +108,28 @@ function Invoke-NRMenu {
             '2' { Invoke-NRRepair -Deep:$false -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
             '3' { Invoke-NRRepair -Deep:$true -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
             '4' { $b = New-NRBackup; Write-NRLine ('备份完成：{0}' -f $b.Path) 'Green'; Pause-NR }
-            '5' { $p = Read-Host '请输入备份目录或 .reg 文件路径'; if ($p) { Restore-NRBackup -BackupPath $p -AssumeYes:$Yes | Out-Null }; Pause-NR }
+            '5' {
+                $points = @(Get-NRRestorePoints)
+                Show-NRRestorePointList -RestorePoints $points
+                if ($points.Count -gt 0) {
+                    $action = Read-Host '操作：[R] 从恢复点恢复  [P] 清理超出保留额度  [F] 固定/取消固定  [直接输入备份目录或 .reg 路径]  [回车取消]'
+                    if ($action -match '^(?i)r$') {
+                        $idx = Read-Host '恢复点序号'
+                        if ($idx -match '^\d+$') { Restore-NRBackup -RestorePointIndex ([int]$idx) -AssumeYes:$Yes | Out-Null }
+                    } elseif ($action -match '^(?i)p$') {
+                        Invoke-NRRestorePointPruneInteractive -AssumeYes:$Yes | Out-Null
+                    } elseif ($action -match '^(?i)f$') {
+                        $idx = Read-Host '恢复点序号'
+                        if ($idx -match '^\d+$') {
+                            $pin = Switch-NRRestorePointPin -RestorePoints $points -Index ([int]$idx) -AssumeYes:$Yes
+                            if ($pin.Success) { Write-NRLine ('固定标记已更新：Pinned={0}' -f $pin.Pinned) 'Green' }
+                        }
+                    } elseif ($action) {
+                        Restore-NRBackup -BackupPath $action -AssumeYes:$Yes | Out-Null
+                    }
+                }
+                Pause-NR
+            }
             '6' { $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
             '7' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
             '0' { return 0 }
@@ -120,6 +143,7 @@ try {
     $relaunch = New-Object System.Collections.Generic.List[string]
     [void]$relaunch.Add('-Mode'); [void]$relaunch.Add($Mode)
     if ($BackupPath) { [void]$relaunch.Add('-BackupPath'); [void]$relaunch.Add(('"{0}"' -f ($BackupPath -replace '"','\"'))) }
+    if ($RestorePointIndex -gt 0) { [void]$relaunch.Add('-RestorePointIndex'); [void]$relaunch.Add([string]$RestorePointIndex) }
     if ($ReportPath) { [void]$relaunch.Add('-ReportPath'); [void]$relaunch.Add(('"{0}"' -f ($ReportPath -replace '"','\"'))) }
     if ($NetworkId) { [void]$relaunch.Add('-NetworkId'); [void]$relaunch.Add($NetworkId) }
     if ($NewName) { [void]$relaunch.Add('-NewName'); [void]$relaunch.Add(('"{0}"' -f $NewName)) }
@@ -140,7 +164,9 @@ try {
             if ($Json) { $r | ConvertTo-Json -Depth 8 }
             if (-not $r.Success) { exit 7 }
         }
-        'Restore' { if (-not $BackupPath) { throw 'Restore 模式必须提供 -BackupPath。' }; $r = Restore-NRBackup -BackupPath $BackupPath -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 6 } }
+        'Restore' { if (-not $BackupPath -and $RestorePointIndex -le 0) { throw 'Restore 模式必须提供 -BackupPath 或 -RestorePointIndex。' }; $r = Restore-NRBackup -BackupPath $BackupPath -RestorePointIndex $RestorePointIndex -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 6 } }
+        'RestorePoints' { $r = Get-NRRestorePointSummary; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Show-NRRestorePointList -RestorePoints $r.Points; Write-NRLine ('恢复点总数 {0}，超出保留额度 {1} 个。' -f $r.Total, $r.PruneCandidates) 'DarkGray' } }
+        'Prune' { $plan = Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints); Show-NRRestorePointPlan -Plan $plan; $r = Invoke-NRRestorePointPrune -Plan $plan -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine $r.Message 'Green' }; if (-not $r.Success) { exit 8 } }
         'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
     }
     exit 0
