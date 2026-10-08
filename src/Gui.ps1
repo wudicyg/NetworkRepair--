@@ -284,6 +284,7 @@ function New-NRGuiForm {
         [pscustomobject]@{ Name = 'btnRestorePoints'; Text = '恢复点管理';     Key = 'RestorePoints' }
         [pscustomobject]@{ Name = 'btnExportReport';  Text = '导出诊断报告';   Key = 'ExportReport' }
         [pscustomobject]@{ Name = 'btnOpenLogs';      Text = '打开日志目录';   Key = 'OpenLogs' }
+        [pscustomobject]@{ Name = 'btnCheckUpdate';   Text = '检查更新';       Key = 'CheckUpdate' }
         [pscustomobject]@{ Name = 'btnAbout';         Text = '关于';           Key = 'About' }
     )
     foreach ($spec in $buttonSpecs) {
@@ -370,7 +371,7 @@ function Invoke-NRGuiSmokeTest {
             $named = @($tree | Where-Object { $_.Name } | ForEach-Object { $_.Name })
             $zero = @($tree | Where-Object { $_.Width -le 0 -or $_.Height -le 0 } | ForEach-Object { $_.Name })
 
-            foreach ($required in @('rootLayout','headerPanel','titleLabel','cardsPanel','buttonsPanel','logBox','statusPanel','statusLabel','btnDiagnose','btnSafeRepair','btnDeepRepair','btnBackup','btnRestorePoints','btnExportReport','btnOpenLogs','btnAbout')) {
+            foreach ($required in @('rootLayout','headerPanel','titleLabel','cardsPanel','buttonsPanel','logBox','statusPanel','statusLabel','btnDiagnose','btnSafeRepair','btnDeepRepair','btnBackup','btnRestorePoints','btnExportReport','btnOpenLogs','btnCheckUpdate','btnAbout')) {
                 if ($named -notcontains $required) { throw ('界面缺少控件：{0}' -f $required) }
             }
 
@@ -569,6 +570,47 @@ function Invoke-NRGuiExportReport {
     [void][System.Windows.Forms.MessageBox]::Show(('诊断报告已导出（已脱敏）：' + "`r`n" + $report.Path), 'NetworkRepair', 'OK', 'Information')
 }
 
+function Invoke-NRGuiUpdateCheck {
+    <#
+        检查是否有新版本。**只检查、只跳转**：不下载、不替换自身。
+        界面上给出结论，用户自己在浏览器里下载。
+    #>
+    param([switch]$Silent)
+
+    Write-NRGuiLog -Message '正在检查更新（只访问 GitHub 公开的发布信息，不上报任何数据）…' -Kind 'Head'
+    $update = Get-NRLatestRelease
+    $message = Get-NRUpdateCheckMessage -Result $update
+    Write-NRGuiLog -Message $message -Kind $(if ($update.IsNewer) { 'Warn' } elseif ($update.Success) { 'Ok' } else { 'Warn' })
+
+    if ($Silent) { return $update }
+
+    if (-not $update.Success) {
+        [void][System.Windows.Forms.MessageBox]::Show(
+            ('无法检查更新：' + "`r`n`r`n" + $update.Error + "`r`n`r`n" + '可能是当前网络无法访问 GitHub。这不影响其他功能。'),
+            '检查更新', 'OK', 'Warning')
+        return $update
+    }
+    if (-not $update.IsNewer) {
+        [void][System.Windows.Forms.MessageBox]::Show(
+            ('已是最新版本 ' + $update.CurrentVersion + '。'),
+            '检查更新', 'OK', 'Information')
+        return $update
+    }
+
+    $answer = [System.Windows.Forms.MessageBox]::Show(
+        ('发现新版本 ' + $update.Version + '（当前 ' + $update.CurrentVersion + '）。' + "`r`n`r`n" +
+         '是否打开下载页面？本程序不会自动下载或替换自身，请自行确认后再替换。'),
+        '检查更新', 'YesNo', 'Information')
+    if ($answer -eq 'Yes' -and $update.Url) {
+        try {
+            Start-Process -FilePath $update.Url | Out-Null
+        } catch {
+            Write-NRGuiLog -Message ('无法打开浏览器：{0}' -f $_.Exception.Message) -Kind 'Warn'
+        }
+    }
+    $update
+}
+
 function Show-NRGuiRestorePointDialog {
     Initialize-NRGuiAssemblies
 
@@ -760,6 +802,7 @@ function Show-NRGui {
         OpenLogs = {
             if (Test-Path -LiteralPath $Script:Logs) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"{0}"' -f $Script:Logs) | Out-Null }
         }
+        CheckUpdate = { Invoke-NRGuiOperation -StatusText '正在检查更新…' -Action { [void](Invoke-NRGuiUpdateCheck) } }
         About = {
             [void][System.Windows.Forms.MessageBox]::Show(
                 ('NetworkRepair v' + $Script:AppVersion + "`r`n`r`n" +
@@ -780,7 +823,14 @@ function Show-NRGui {
         Write-NRGuiLog -Message '安全原则：先诊断 → 先备份 → 再修改 → 最后验证。'
         Invoke-NRGuiOperation -StatusText '正在执行首次诊断…' -Action {
             $snapshot = Update-NRGuiFromDiagnostics
+            $script:NRGuiStartupHealth = [string]$snapshot.Diagnostics.NetworkHealth.Status
             Write-NRGuiLog -Message ('网络健康={0}；可安全清理={1} 个；恢复点={2} 个。' -f $snapshot.Diagnostics.NetworkHealth.Status, $snapshot.Diagnostics.SafeCandidateCount, [int](Get-NRPropertyValue -InputObject $snapshot.RestorePointSummary -Name 'Total')) -Kind 'Ok'
+        }
+        # 启动时的更新检查只在网络健康时做：本工具常被用来修网络，网络不通时不要卡在这里。
+        if ($script:NRGuiStartupHealth -ceq 'Healthy') {
+            Invoke-NRGuiOperation -StatusText '正在检查更新…' -Action { [void](Invoke-NRGuiUpdateCheck -Silent) }
+        } else {
+            Write-NRGuiLog -Message '当前网络健康度不足，已跳过启动时的更新检查（可稍后手动点「检查更新」）。' -Kind 'Warn'
         }
     })
 
