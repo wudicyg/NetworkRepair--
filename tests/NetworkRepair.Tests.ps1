@@ -169,6 +169,25 @@
         $r.DiagnosticCodes | Should -Contain 'NR1002'
     }
 
+    It 'backs up scoped NetworkList keys for safe restore' {
+        $path = Join-Path $root 'src\Backup.ps1'
+        $content = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+        $content | Should -Match 'NetworkList-Profiles\.reg'
+        $content | Should -Match 'NetworkList-NewNetworks\.reg'
+        $content | Should -Match 'ProfilesBackup'
+        $content | Should -Match 'NewNetworksBackup'
+    }
+
+    It 'keeps Restore scoped to Profiles and NewNetworks' {
+        $path = Join-Path $root 'src\Backup.ps1'
+        $content = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+        $content | Should -Match 'Resolve-NRScopedBackupFile'
+        $content | Should -Match 'Test-NRRegistryScopeSnapshotMatch'
+        $content | Should -Not -Match ([regex]::Escape('& reg.exe import $reg'))
+        $content | Should -Match 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles'
+        $content | Should -Match 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\NewNetworks'
+    }
+
     It 'compares registry snapshots canonically across ordering and registry-name casing' {
         $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_test_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
