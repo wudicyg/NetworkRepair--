@@ -23,6 +23,18 @@ function Assert-NRAdministrator {
     Write-NRLog 'Administrator privileges confirmed.'
 }
 function Confirm-NRAction { param([Parameter(Mandatory)][string]$Message,[switch]$AssumeYes); if ($AssumeYes) { return $true }; (Read-Host ('{0} [Y/N]' -f $Message)) -match '^(?i)(y|yes|是|确认)$' }
+function Get-NRPropertyValue {
+    param(
+        [object]$InputObject,
+        [Parameter(Mandatory)][string]$Name
+    )
+    if ($null -eq $InputObject) { return $null }
+    try {
+        $property = $InputObject.PSObject.Properties[$Name]
+        if ($null -ne $property) { return $property.Value }
+    } catch { }
+    return $null
+}
 function Get-NRRegistryRoot { 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList' }
 function Get-NRProfileRegistryObjects {
     $base=Join-Path (Get-NRRegistryRoot) 'Profiles'; if (-not (Test-Path -LiteralPath $base)) { return @() }
@@ -37,7 +49,7 @@ function Get-NRProfileRegistryObjects {
         } catch {
             $lastWrite=$null
         }
-        [pscustomobject]@{KeyName=$item.PSChildName;ProfileName=[string]$props.ProfileName;Description=[string]$props.Description;Category=$props.Category;Managed=$props.Managed;RegistryPath=$item.PSPath;LastWrite=$lastWrite}
+        [pscustomobject]@{KeyName=$item.PSChildName;ProfileName=[string](Get-NRPropertyValue -InputObject $props -Name 'ProfileName');Description=[string](Get-NRPropertyValue -InputObject $props -Name 'Description');Category=Get-NRPropertyValue -InputObject $props -Name 'Category';Managed=Get-NRPropertyValue -InputObject $props -Name 'Managed';RegistryPath=$item.PSPath;LastWrite=$lastWrite}
     }; @($result)
 }
 function Get-NRActiveProfileNames { try { @(Get-NetConnectionProfile -ErrorAction Stop | Where-Object Name | Select-Object -ExpandProperty Name -Unique) } catch { Write-NRLog ('Get-NetConnectionProfile failed: {0}' -f $_.Exception.Message) 'WARN'; @() } }
