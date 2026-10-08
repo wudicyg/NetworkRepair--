@@ -1,0 +1,74 @@
+﻿[CmdletBinding()]
+param(
+    [string]$OutputPath,
+    [switch]$SkipConnectivityTest
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$Root = Split-Path -Parent $PSScriptRoot
+$Src = Join-Path $Root 'src'
+
+$Script:AppName = 'NetworkRepair'
+$Script:AppVersion = '0.4.0-dev'
+$Script:Root = $Root
+$Script:Src = $Src
+$Script:Backups = Join-Path $Root 'backups'
+$Script:Logs = Join-Path $env:TEMP 'NetworkRepair-Validation'
+$Script:Reports = Join-Path $env:TEMP 'NetworkRepair-Validation'
+if (-not (Test-Path -LiteralPath $Script:Logs)) {
+    New-Item -ItemType Directory -Path $Script:Logs -Force | Out-Null
+}
+$Script:LogFile = Join-Path $Script:Logs ('validation_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss_fff'))
+
+. (Join-Path $Src 'Common.ps1')
+. (Join-Path $Src 'NetworkListManager.ps1')
+. (Join-Path $Src 'NetworkIdentity.ps1')
+. (Join-Path $Src 'RepairPlan.ps1')
+. (Join-Path $Src 'Ncsi.ps1')
+. (Join-Path $Src 'Diagnostics.ps1')
+
+$diagnostics = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
+
+$evidence = [pscustomobject]@{
+    SchemaVersion = '1.0'
+    ReadOnly = $true
+    GeneratedAt = (Get-Date).ToString('o')
+    ComputerName = $env:COMPUTERNAME
+    Application = $Script:AppName
+    ApplicationVersion = $Script:AppVersion
+    Windows = $diagnostics.Windows
+    NetworkHealth = $diagnostics.NetworkHealth
+    ProfileHygieneStatus = $diagnostics.ProfileHygieneStatus
+    RepairRecommendation = $diagnostics.RepairRecommendation
+    SafeCandidateCount = $diagnostics.SafeCandidateCount
+    HighRiskCount = $diagnostics.HighRiskCount
+    NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
+        $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
+    }).Count
+    CurrentConnections = @($diagnostics.Connections | Select-Object Name,InterfaceAlias,NetworkCategory,IPv4Connectivity,IPv6Connectivity)
+    Adapters = @($diagnostics.Adapters | Select-Object Name,InterfaceDescription,Status,LinkSpeed,MediaType,Virtual)
+    NetworkListManager = [pscustomobject]@{
+        Available = [bool]$diagnostics.NetworkListManager.Available
+        NetworkCount = if ($diagnostics.NetworkListManager.Available) { @($diagnostics.NetworkListManager.Networks).Count } else { 0 }
+        ExactNetworkIdCorrelationCount = @($diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
+    }
+    Candidates = @($diagnostics.Candidates | Select-Object KeyName,ProfileName,Managed,IsActive,RiskScore,RiskLevel,RemediationAllowed,DiagnosticCodes,NetworkId,NetworkName,NetworkCorrelation,NlmIsConnected,Reason,LastWrite)
+    IPConfiguration = @($diagnostics.IPConfiguration | Select-Object InterfaceAlias,InterfaceIndex,IPv4Addresses,IPv6Addresses,IPv4Gateway,IPv4Dhcp,DnsServersIPv4)
+    Gateways = @($diagnostics.Gateways)
+    DnsServers = @($diagnostics.DnsServers)
+    NCSI = $diagnostics.NCSI
+    IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
+}
+
+if ($OutputPath) {
+    $parent = Split-Path -Parent $OutputPath
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+    $evidence | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
+    Write-Output ('Validation evidence written to: {0}' -f $OutputPath)
+} else {
+    $evidence | ConvertTo-Json -Depth 12
+}

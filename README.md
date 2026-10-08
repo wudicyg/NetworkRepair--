@@ -31,6 +31,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - 修复后重新扫描并进行连通性验证
 - 验证失败自动尝试回滚
 - JSON 诊断报告
+- 只读发布验收证据采集器
 - CLI 模式与交互式菜单
 - Pester 安全规则测试
 - Network List Manager COM 交叉诊断
@@ -136,6 +137,8 @@ NetworkRepair/
 │  └─ Validation.ps1
 ├─ tests/
 │  └─ NetworkRepair.Tests.ps1
+├─ tools/
+│  └─ Invoke-NRReadOnlyValidation.ps1
 ├─ docs/
 ├─ backups/
 ├─ logs/
@@ -156,6 +159,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 开发文档
 
+- [Windows 10 / 11 发布验证](docs/release-validation.md)
 - [架构设计](docs/architecture.md)
 - [路线图](docs/roadmap.md)
 - [诊断代码](docs/diagnostic-codes.md)
