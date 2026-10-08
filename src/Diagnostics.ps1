@@ -152,6 +152,7 @@ function Get-NRDiagnostics {
     $gateways = @(Test-NRGateways -Configurations $ip)
     $dnsServers = @(Test-NRDnsServers -Configurations $ip)
     $ncsi = Test-NRNcsi -Skip:$SkipConnectivityTest
+    $networkHealth = Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
 
     $safeCandidates = @($suspects | Where-Object RemediationAllowed)
     $highRisk = @($suspects | Where-Object { $_.RiskLevel -eq 'High' -or $_.RiskLevel -eq 'Caution' })
@@ -188,6 +189,67 @@ function Get-NRDiagnostics {
         DnsServers = @($dnsServers)
         NCSI = $ncsi
         Connectivity = $connectivity
+        NetworkHealth = $networkHealth
+        ProfileHygieneStatus = if ($safeCandidates.Count) { 'HistoricalProfilesFound' } elseif (@($suspects | Where-Object { $_.ProfileName -match '^(网络|Network)\s+\d+
+        IssueDetails = @($issueDetails)
+        SafeCandidateCount = $safeCandidates.Count
+        HighRiskCount = $highRisk.Count
+    }
+}
+
+function Show-NRDiagnostics {
+    param([Parameter(Mandatory)]$Diagnostics)
+    Show-NRBanner
+    Write-NRSection '系统'
+    Write-NRLine ('Windows    : {0} {1} (Build {2})' -f $Diagnostics.Windows.Caption, $Diagnostics.Windows.Version, $Diagnostics.Windows.Build)
+    Write-NRLine ('PowerShell : {0}' -f $Diagnostics.Windows.PowerShell)
+
+    Write-NRSection '当前连接'
+    if ($Diagnostics.Connections.Count -eq 0) { Write-NRLine '没有读取到活动连接 Profile。' 'Yellow' }
+    else { foreach ($c in $Diagnostics.Connections) { Write-NRLine ('{0} | 网卡={1} | 类型={2} | IPv4={3} | IPv6={4}' -f $c.Name, $c.InterfaceAlias, $c.NetworkCategory, $c.IPv4Connectivity, $c.IPv6Connectivity) } }
+
+    Write-NRSection 'Network List Manager'
+    if ($Diagnostics.NetworkListManager.Available) {
+        Write-NRLine ('已读取 {0} 个网络对象。' -f $Diagnostics.NetworkListManager.Networks.Count) 'Green'
+        $exact = @($Diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
+        Write-NRLine ('Profile ↔ NetworkId 精确关联：{0} 个。' -f $exact) 'Green'
+    }
+    else { Write-NRLine 'Network List Manager COM 不可用，已回退到 PowerShell/注册表诊断。' 'Yellow' }
+
+    Write-NRSection 'IP / DHCP / 网关 / DNS'
+    foreach ($cfg in @($Diagnostics.IPConfiguration)) {
+        Write-NRLine ('{0} | IPv4={1} | DHCPv4={2} | Gateway={3} | DNS={4}' -f $cfg.InterfaceAlias, (@($cfg.IPv4Addresses) -join ','), $cfg.IPv4Dhcp, (@($cfg.IPv4Gateway) -join ','), (@($cfg.DnsServersIPv4) -join ','))
+    }
+
+    Write-NRSection 'NCSI'
+    if ($Diagnostics.NCSI.Skipped) { Write-NRLine '已跳过 NCSI 网络探测。' 'Yellow' }
+    else { Write-NRLine ('DNS={0} | HTTP={1} | Probe={2}' -f $Diagnostics.NCSI.Dns, $Diagnostics.NCSI.Http, $Diagnostics.NCSI.WebUrl) $(if ($Diagnostics.NCSI.Dns -and $Diagnostics.NCSI.Http) { 'Green' } else { 'Yellow' }) }
+
+    Write-NRSection '可疑 Profile'
+    if ($Diagnostics.Candidates.Count -eq 0) { Write-NRLine '没有命中当前的安全清理规则。' 'Green' }
+    else { foreach ($p in $Diagnostics.Candidates) { $color = if ($p.RemediationAllowed) { 'Yellow' } else { 'Red' }; Write-NRLine ('[{0} score={1}] {2} | Active={3} | Managed={4} | {5}' -f $p.RiskLevel, $p.RiskScore, $p.ProfileName, $p.IsActive, $p.Managed, $p.Reason) $color } }
+
+    Write-NRSection '健康状态与修复建议'
+    $healthColor = if ($Diagnostics.NetworkHealth.Status -eq 'Healthy') { 'Green' } elseif ($Diagnostics.NetworkHealth.Status -eq 'Degraded') { 'Yellow' } else { 'Red' }
+    Write-NRLine ('网络健康：{0} | {1}' -f $Diagnostics.NetworkHealth.Status,$Diagnostics.NetworkHealth.Reason) $healthColor
+    switch ($Diagnostics.ProfileHygieneStatus) {
+        'HistoricalProfilesFound' { Write-NRLine ('Profile 状态：发现 {0} 个可安全清理的历史编号 Profile（网络本身不一定有故障）。' -f $Diagnostics.SafeCandidateCount) 'Yellow' }
+        'ProtectedNumberedProfilesPresent' { Write-NRLine 'Profile 状态：发现编号 Profile，但当前对象受到活动/Managed 等安全规则保护，不会自动删除。' 'Yellow' }
+        default { Write-NRLine 'Profile 状态：未发现需要自动清理的编号历史 Profile。' 'Green' }
+    }
+    switch ($Diagnostics.RepairRecommendation) {
+        'CleanHistoricalProfiles' { Write-NRLine '建议：网络本身健康，但存在历史编号 Profile，可进入安全清理流程。' 'Yellow' }
+        'InvestigateNetwork' { Write-NRLine '建议：当前网络存在连通性问题，应优先调查网络故障。' 'Yellow' }
+        default { Write-NRLine '建议：当前网络健康且没有可安全清理的历史 Profile，无需修复。' 'Green' }
+    }
+
+    Write-NRSection '结论'
+    if ($Diagnostics.IssueDetails.Count -eq 0) { Write-NRLine '当前没有发现明显网络故障。' 'Green' }
+    else { foreach ($i in $Diagnostics.IssueDetails) { Write-NRLine ('[{0}] {1}' -f $i.Code, $i.Message) 'Yellow' } }
+}
+
+ }).Count) { 'ProtectedNumberedProfilesPresent' } else { 'Clean' }
+        RepairRecommendation = if ($safeCandidates.Count) { 'CleanHistoricalProfiles' } elseif ($networkHealth.Status -eq 'Healthy') { 'NoAction' } else { 'InvestigateNetwork' }
         Issues = @($issueDetails | ForEach-Object Message)
         IssueDetails = @($issueDetails)
         SafeCandidateCount = $safeCandidates.Count
