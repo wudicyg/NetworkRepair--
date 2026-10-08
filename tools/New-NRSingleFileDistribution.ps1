@@ -246,7 +246,11 @@ if (-not $SkipExecutable) {
         if (-not $NoElevationManifest) { $compileArguments.RequireAdmin = $true }
         if (-not $Console) {
             # 图形版：没有控制台窗口，按 STA + DPI 感知运行 WinForms。
+            # 必须同时加 -noOutput：ps2exe 在无控制台模式下会把脚本输出（Write-Output 与
+            # Write-Host 都算）收集起来，用一个模态对话框显示，进程会一直等到用户点「确定」。
+            # 实测：不加 -noOutput 时，打包后的 exe 一有输出就弹窗并卡住。
             $compileArguments.NoConsole = $true
+            $compileArguments.NoOutput = $true
             $compileArguments.STA = $true
             $compileArguments.DPIAware = $true
         }
