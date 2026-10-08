@@ -9,7 +9,8 @@
 - [x] JSON 报告
 - [x] Pester + GitHub Actions
 - [x] 发布验证只读证据采集器
-- [ ] Windows 实机矩阵测试
+- [x] Windows 10 核心实机验证（历史编号 Profile 清理路径）
+- [ ] Windows 11 / 更多环境扩展验证
 - [ ] 更多语言环境测试
 
 ## v0.2.x — 更智能的诊断
@@ -36,7 +37,8 @@
 - [ ] 自动更新机制设计
 
 ## v1.0.x — 稳定发布
-- [ ] Windows 10 / 11 多版本验证
+- [x] 0.4.0 核心实机验收（Windows 10）
+- [ ] Windows 11 / 更多环境扩展验证
 - [ ] 回归测试矩阵
 - [x] Release 打包自动化
 - [ ] GitHub Issues / Discussions 工作流

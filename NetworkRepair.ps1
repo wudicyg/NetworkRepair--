@@ -14,7 +14,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Script:AppName = 'NetworkRepair'
-$Script:AppVersion = '0.4.0-dev'
+$Script:AppVersion = '0.4.0'
 $Script:Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Script:Src = Join-Path $Script:Root 'src'
 $Script:Backups = Join-Path $Script:Root 'backups'

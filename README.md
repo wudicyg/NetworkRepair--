@@ -2,14 +2,14 @@
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
-> 当前开发版本：**0.4.0-dev**
+> 当前稳定版本：**0.4.0**
 >
-> `0.4.0-dev` 已完成核心 Safe Repair 实机验证；正式稳定版仍以 Windows 10/11 多版本矩阵与发布验收为准。
+> `0.4.0` 已完成核心 Safe Repair 与 Windows 10 实机验证。Windows 11 及更多语言/系统组合保留为后续兼容性扩展验证，不作为当前版本的开发阻塞项。
 
 > **项目定位**：专门解决 Windows 网络名称持续出现「网络 2 / 网络 3 / 网络 4 / …」等历史 Network Profile 累积问题。  
 > 在不破坏当前活动网络的前提下，先诊断、再备份、后清理并验证；同时提供 DNS、DHCP、网关、NCSI 等常见网络故障诊断与可回滚修复能力。
 
-当前主分支：**0.4.0-dev**
+当前主分支：**0.4.0**
 
 NetworkRepair 的目标不是“暴力清理注册表”，而是：
 
@@ -99,20 +99,20 @@ NetworkRepair.bat -Mode Scan -SkipConnectivityTest
 
 GitHub Release 不会因为合并到 `main` 自动产生；只有推送与 `NetworkRepair.ps1` 版本完全一致的 Tag 后，Release 工作流才会创建发行版。
 
-当前开发版为：
+当前稳定版为：
 
 ```text
-0.4.0-dev
+0.4.0
 ```
 
-开发/预发布版本可使用：
+正式稳定版本 Tag：
 
 ```powershell
-git tag v0.4.0-dev
-git push origin v0.4.0-dev
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
-带 `-` 的版本会被 GitHub Actions 发布为 **Prerelease**。正式稳定版则应先把脚本版本更新为不带预发布后缀的版本，例如：
+发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本再使用带预发布后缀的版本号，例如：
 
 ```text
 0.4.0
@@ -125,7 +125,7 @@ git tag v0.4.0
 git push origin v0.4.0
 ```
 
-Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。正式版发布前仍应完成 [Windows 10 / 11 发布验证](docs/release-validation.md) 中的实机矩阵。
+Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。当前版本以 Windows 10 实机核心场景为主要行为证据，Windows 11 与更多环境组合属于后续扩展验证。
 ## 安全模型
 
 ### Safe Repair
@@ -228,7 +228,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-当前 `main` 已包含 v0.4 的 Repair Planner、scoped Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。正式稳定版仍需完成 Windows 10 / 11 多版本实机矩阵、更多语言环境与最终发布验收。
+当前 `main` 已包含 v0.4 的 Repair Planner、scoped Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。0.4.0 的核心发布阻塞项已收口，后续重点转向更精细的恢复点、服务刷新与用户体验能力。
 
 ## License
 

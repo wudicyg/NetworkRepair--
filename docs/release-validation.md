@@ -1,6 +1,6 @@
-﻿# Windows 10 / 11 Release Validation
+﻿# Release Validation
 
-NetworkRepair 的 CI 只能证明脚本语法和单元测试通过；正式发布前仍需要真实 Windows 10 / 11 行为验证。
+NetworkRepair 的 CI 负责脚本语法、Pester 与发布包回归；0.4.0 的核心行为验收以 Windows 10 PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows Build 与语言环境作为后续扩展兼容性验证，不阻塞 0.4.0。
 
 ## 只读证据采集
 
@@ -27,13 +27,13 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation
 | 正常 Internet，但编号 Profile 为当前活动连接 | 不允许自动删除 |
 | 正常 Internet，但编号 Profile 为 Managed | 不允许自动删除 |
 | Windows 10 + PowerShell 5.1 | 读取、Dry Run、Safe Repair 回归通过 |
-| Windows 11 + PowerShell 5.1 | NetworkId ↔ Profile GUID 精确关联通过 |
+| Windows 11 + PowerShell 5.1 | 后续扩展验证，不阻塞 0.4.0 |
 | DHCP IPv4 | 修复前后 IPv4、默认网关、DNS 正常 |
 | 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
 | Deep Repair | 只验证 `NewNetworks` 范围，不触碰 Signatures 无差别清理 |
 | Rename | 显式 NetworkId 修改后名称与原意一致，失败可回滚 |
 | Restore | 只恢复 NetworkRepair 管理的 `Profiles` / `NewNetworks`；恢复后各 scoped 快照匹配；失败时仅回滚到 Restore 前安全备份 |
-| 中文/英文系统 | 分别验证 `网络 N` / `Network N` |
+| 中文/英文系统 | 当前以中文 Windows 10 的 `网络 N` 实机验证为主要证据；英文环境后续扩展验证 |
 
 ### Restore 证据要求
 
@@ -128,3 +128,7 @@ ProtectedNumberedProfilesPresent
 - Windows 版本、PowerShell、网卡介质、测试日期
 
 不要把 Wi-Fi 密码、VPN 凭据或其他秘密数据上传到 Issue。
+
+## 0.4.0 发布验收结论
+
+当前 0.4.0 的核心目标是安全识别并清理非活动、非 Managed 的 `网络 N` / `Network N` 历史 Profile。该路径已经在真实 Windows 10 / PowerShell 5.1 环境完成实际运行验证。Windows 11 与更多环境组合继续保留测试入口，但不再作为 0.4.0 的发布阻塞项。

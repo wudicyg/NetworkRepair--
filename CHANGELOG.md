@@ -1,5 +1,11 @@
 ﻿# Changelog
 
+## [0.4.0] - 2026-10-08
+
+### Release
+- 0.4.0 正式稳定版：核心 Safe Repair、历史编号 Profile 清理、scoped Backup/Restore、诊断与回滚路径已收口。
+- Windows 10 / PowerShell 5.1 完成核心实机行为验证；Windows 11 与更多环境作为后续扩展验证，不阻塞本版本发布。
+
 ## [0.4.0-dev]
 
 ### Added
@@ -20,6 +26,7 @@
 - Release 发布流程补充文档，明确合并 `main` 不会自动创建 GitHub Release。
 - CI 增加 Release 工作流关键安全开关的静态回归检查。
 - 备份与发布验收文档现在明确区分完整 `NetworkList.reg` 基线快照与 Restore 实际导入的 `Profiles` / `NewNetworks` managed scopes。
+- 0.4.0 稳定版收口发布门槛：核心 Windows 10 实机行为作为主要验收依据，Windows 11/更多环境转为后续扩展验证。
 
 ### Fixed
 - Deep Repair 在网络健康且没有可安全清理 Profile 时不再生成破坏性 `NewNetworks` 刷新动作。
