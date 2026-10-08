@@ -82,30 +82,9 @@ jobs:
 
       - name: Inspect release package contents
         run: |
-          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
-          $temp = Join-Path $env:TEMP ('NetworkRepairReleaseCheck_' + [guid]::NewGuid().ToString('N'))
-          New-Item -ItemType Directory -Path $temp -Force | Out-Null
-          try {
-            Expand-Archive -LiteralPath $zip.FullName -DestinationPath $temp -Force
-            $root = Get-ChildItem -LiteralPath $temp -Directory | Select-Object -First 1
-            if (-not $root) { throw 'Release package root directory is missing.' }
-            foreach ($required in @('网络修复工具.exe','NetworkRepair.single.ps1','使用说明.md','备用启动','NetworkRepair.ps1','README.md','LICENSE','CHANGELOG.md','src','docs','tools','RELEASE-MANIFEST.txt')) {
-              if (-not (Test-Path -LiteralPath (Join-Path $root.FullName $required))) {
-                throw "Required release content missing: $required"
-              }
-            }
-            foreach ($forbidden in @('tests','.git','.github','backups','logs','reports')) {
-              if (Test-Path -LiteralPath (Join-Path $root.FullName $forbidden)) {
-                throw "Forbidden runtime/development content included: $forbidden"
-              }
-            }
-            # 面向普通用户的包只保留一个显式入口，旧的 ASCII 启动器不再随包分发。
-            if (Test-Path -LiteralPath (Join-Path $root.FullName 'NetworkRepair.bat')) {
-              throw 'Legacy ASCII launcher must not be shipped in the friendly package.'
-            }
-          } finally {
-            Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
-          }
+          # Verification lives in a BOM-protected repository script so this run step stays pure ASCII.
+          # PowerShell 5.1 would otherwise mis-decode the runner's own temporary script file.
+          & .\tools\Test-NRReleasePackage.ps1 -PackageOutputDirectory .\release-check -RequireExecutable -VerifyEntryRuns
 
       - name: Validate release workflow safety
         run: |
@@ -118,24 +97,6 @@ jobs:
           if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern '--verify-tag' -Quiet)) {
             throw 'Release workflow tag verification is missing.'
           }
-      - name: Verify release package checksum
-        run: |
-          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
-          if (-not $zip) { throw 'Release package checksum inputs are missing.' }
-          # 现在会同时产出「打包 zip」与「便携 exe」两份校验文件，必须按同名匹配。
-          $shaFile = Get-ChildItem .\release-check\*.sha256 | Where-Object { $_.BaseName -eq $zip.BaseName } | Select-Object -First 1
-          if (-not $shaFile) { throw 'Release package checksum file is missing.' }
-          $lines = @(Get-Content -LiteralPath $shaFile.FullName -Encoding ASCII | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-          if ($lines.Count -ne 1) { throw 'Release SHA-256 file must contain exactly one non-empty line.' }
-          $parts = $lines[0] -split '\s+', 2
-          if ($parts.Count -ne 2 -or $parts[0].Length -ne 64 -or $parts[0] -notmatch '^[0-9a-fA-F]{64}$') { throw 'Release SHA-256 file format is invalid.' }
-          $expectedHash = $parts[0].ToLowerInvariant()
-          $expectedName = $parts[1].Trim()
-          if ($expectedName -ne $zip.Name) { throw ('Checksum filename does not match ZIP name: {0}' -f $expectedName) }
-          $actualHash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actualHash -ne $expectedHash) { throw ('Release SHA-256 mismatch. Expected {0}, actual {1}.' -f $expectedHash, $actualHash) }
-          Write-Host ('Release SHA-256 verified: {0}' -f $actualHash)
-
       - name: Verify single-file entry actually runs
         run: |
           $result = & .\tools\New-NRSingleFileDistribution.ps1 -OutputDirectory .\dist-check -NoElevationManifest | ConvertFrom-Json
@@ -150,16 +111,3 @@ jobs:
 
           Write-Host ('Executable entry output: {0}' -f $exeOutput)
           Write-Host ('Single-file script output: {0}' -f $scriptOutput)
-
-      - name: Verify packaged entry names survive zip encoding
-        run: |
-          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [IO.Compression.ZipFile]::OpenRead($zip.FullName)
-          try { $names = @($archive.Entries | ForEach-Object { ($_.FullName -replace '\\','/') }) } finally { $archive.Dispose() }
-
-          foreach ($expected in @('网络修复工具.exe','使用说明.md','备用启动/启动-网络修复工具.bat','NetworkRepair.single.ps1')) {
-            $matches = @($names | Where-Object { $_ -like ('*/' + $expected) })
-            if ($matches.Count -ne 1) { throw ('Packaged entry missing or duplicated after zip round-trip: {0}' -f $expected) }
-          }
-          Write-Host 'Packaged entry names verified.'
