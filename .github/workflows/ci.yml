@@ -127,3 +127,15 @@ jobs:
           }
           if ($process.ExitCode -ne 0) { throw ('Graphical interface smoke test failed with exit code {0}.' -f $process.ExitCode) }
           Write-Host 'Graphical interface smoke test passed.'
+
+      - name: Verify the update check against the published releases
+        run: |
+          # The atom feed is the primary source because the anonymous REST API is rate limited.
+          # This step is the only place where the real network path is exercised: unit tests mock it,
+          # and a mocked test cannot catch a TLS or data source problem.
+          $update = & powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\NetworkRepair.ps1 -Mode CheckUpdate -Json | ConvertFrom-Json
+          if (-not $update.Success) { throw ('Update check failed: {0}' -f $update.Error) }
+          if ($update.Source -ne 'atom') { throw ('Expected the atom feed to be used, got: {0}' -f $update.Source) }
+          if ($update.Version -notmatch '^\d+\.\d+\.\d+') { throw ('Unexpected released version: {0}' -f $update.Version) }
+          if ($null -eq $update.Comparison) { throw ('Version comparison failed for {0}.' -f $update.Version) }
+          Write-Host ('Update check ok: source={0} current={1} latest={2}' -f $update.Source, $update.CurrentVersion, $update.Version)
