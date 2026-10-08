@@ -1,13 +1,11 @@
-﻿Describe 'NetworkRepair safety rules' {
-    BeforeAll {
-        $root = Split-Path -Parent $PSScriptRoot
-        . (Join-Path $root 'src\Common.ps1')
-        . (Join-Path $root 'src\NetworkListManager.ps1')
-        . (Join-Path $root 'src\NetworkIdentity.ps1')
-        . (Join-Path $root 'src\Ncsi.ps1')
-        . (Join-Path $root 'src\Diagnostics.ps1')
-    }
+﻿$root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $root 'src\Common.ps1')
+. (Join-Path $root 'src\NetworkListManager.ps1')
+. (Join-Path $root 'src\NetworkIdentity.ps1')
+. (Join-Path $root 'src\Ncsi.ps1')
+. (Join-Path $root 'src\Diagnostics.ps1')
 
+Describe 'NetworkRepair safety rules' {
     It 'marks an inactive Chinese numbered profile as Low and removable' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 3';Category=0;Managed=0;RegistryPath='HKLM:\dummy';LastWrite=(Get-Date)}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
