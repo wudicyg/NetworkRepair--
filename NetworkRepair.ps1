@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Menu','Scan','DryRun','Repair','DeepRepair','Backup','Restore','Report','Rename','Version')]
+    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','Report','Rename','Version')]
     [string]$Mode = 'Menu',
     [string]$BackupPath,
     [string]$ReportPath,
@@ -74,7 +74,7 @@ function Show-NRQuickStatus {
             Write-NRLine '提示：当前状态需要完整诊断后再决定下一步。' 'Yellow'
         }
 
-        Write-NRLine '（以上为快速概览，只读且跳过 NCSI 主动探测；执行 Repair/Dry Run 前仍会重新读取状态。）' 'DarkGray'
+        Write-NRLine '（以上为快速概览，只读且跳过 NCSI 主动探测；执行 Repair 前仍会重新读取状态。）' 'DarkGray'
     }
     catch {
         Write-NRLine ('快速状态读取失败：{0}' -f $_.Exception.Message) 'Yellow'
@@ -90,8 +90,7 @@ function Show-NRMenu {
     Write-NRLine '  [4] 备份当前网络配置' 'White'
     Write-NRLine '  [5] 从备份恢复' 'White'
     Write-NRLine '  [6] 导出诊断报告' 'White'
-    Write-NRLine '  [7] Dry Run（只预览，不修改）' 'White'
-    Write-NRLine '  [8] 安全重命名网络（显式指定 NetworkId）' 'White'
+    Write-NRLine '  [7] 安全重命名网络（显式指定名称）' 'White'
     Write-NRLine '  [0] 退出' 'White'
     Write-NRLine ''
 }
@@ -109,8 +108,7 @@ function Invoke-NRMenu {
             '4' { $b = New-NRBackup; Write-NRLine ('备份完成：{0}' -f $b.Path) 'Green'; Pause-NR }
             '5' { $p = Read-Host '请输入备份目录或 .reg 文件路径'; if ($p) { Restore-NRBackup -BackupPath $p -AssumeYes:$Yes | Out-Null }; Pause-NR }
             '6' { $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
-            '7' { Invoke-NRRepair -Deep:$false -DryRun -AssumeYes:$false -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
-            '8' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
+            '7' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
             '0' { return 0 }
             default { Write-NRLine '无效选择。' 'Yellow'; Start-Sleep -Milliseconds 700 }
         }
@@ -133,7 +131,6 @@ try {
     switch ($Mode) {
         'Menu' { exit (Invoke-NRMenu) }
         'Scan' { $r = Invoke-NRScan -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } }
-        'DryRun' { $r = Invoke-NRRepair -Deep:$false -DryRun -AssumeYes:$false -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } }
         'Repair' { $r = Invoke-NRRepair -Deep:$false -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'DeepRepair' { $r = Invoke-NRRepair -Deep:$true -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'Backup' { $r = New-NRBackup; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('备份完成：{0}' -f $r.Path) 'Green' } }

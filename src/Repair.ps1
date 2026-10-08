@@ -7,7 +7,7 @@
 }
 
 function Invoke-NRRepair {
-    param([switch]$Deep,[switch]$DryRun,[switch]$AssumeYes,[switch]$SkipConnectivityTest)
+    param([switch]$Deep,[switch]$AssumeYes,[switch]$SkipConnectivityTest)
 
     $d = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
     $decision = Get-NRRepairDecision -Diagnostics $d -Deep:$Deep
@@ -31,7 +31,6 @@ function Invoke-NRRepair {
             Backup=$null
             Validation=$null
             Deep=[bool]$Deep
-            DryRun=[bool]$DryRun
             Plan=$plan
             Decision=$decision
         }
@@ -51,20 +50,6 @@ function Invoke-NRRepair {
         }
     }
 
-    if ($DryRun) {
-        Write-NRLog 'Dry Run completed. No changes made.'
-        return [pscustomobject]@{
-            Success=$true
-            Changed=0
-            Candidates=@($plan.SafeCandidates | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
-            Backup=$null
-            Validation=$d
-            Deep=[bool]$Deep
-            DryRun=$true
-            Plan=$plan
-            Decision=$decision
-        }
-    }
 
     if (-not (Confirm-NRAction -Message '将按上述计划修改网络配置。执行前会自动创建完整备份，继续？' -AssumeYes:$AssumeYes)) {
         Write-NRLog 'Repair cancelled by user.' 'WARN'
@@ -149,7 +134,6 @@ function Invoke-NRRepair {
             Backup=$backup
             Validation=$validation
             Deep=[bool]$Deep
-            DryRun=$false
             Plan=$plan
             Decision=$decision
         }
