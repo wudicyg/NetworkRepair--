@@ -8,54 +8,101 @@
 
 function Invoke-NRRepair {
     param([switch]$Deep,[switch]$DryRun,[switch]$AssumeYes,[switch]$SkipConnectivityTest)
+
     $d = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
-    $safe = @($d.Candidates | Where-Object RemediationAllowed)
-    $high = @($d.Candidates | Where-Object { -not $_.RemediationAllowed })
+    $plan = Get-NRRepairPlan -Candidates $d.Candidates -Deep:$Deep
+
     if (-not $Json) { Show-NRDiagnostics -Diagnostics $d }
 
-    if ($safe.Count -eq 0) {
-        Write-NRLine '没有可安全自动处理的 Profile。' 'Green'
-        Write-NRLog 'No safe repair candidates.'
-        return [pscustomobject]@{Success=$true;Changed=0;Candidates=@();Backup=$null;Validation=$null;Deep=[bool]$Deep;DryRun=[bool]$DryRun}
-    }
-
-    $plan = @{
-        SafeProfileDeletions = @($safe | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
-        HighRiskSkipped = @($high | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes)
-        DeepRequested = [bool]$Deep
+    if ($plan.IsNoOp) {
+        Write-NRLine '没有需要执行的修复操作。' 'Green'
+        Write-NRLog 'Repair plan is a no-op.'
+        return [pscustomobject]@{
+            Success=$true
+            Changed=0
+            Candidates=@()
+            Backup=$null
+            Validation=$null
+            Deep=[bool]$Deep
+            DryRun=[bool]$DryRun
+            Plan=$plan
+        }
     }
 
     if (-not $Json) {
         Write-NRSection $(if ($Deep) { '深度修复计划' } else { '安全修复计划' })
-        foreach ($p in $safe) { Write-NRLine ('[DELETE] {0} | risk={1}/{2}' -f $p.ProfileName,$p.RiskLevel,$p.RiskScore) 'Yellow' }
-        if ($high.Count) { Write-NRLine ('[SKIP] 已跳过 {0} 个需人工确认的项。' -f $high.Count) 'Red' }
+        foreach ($action in @($plan.Actions)) {
+            if ($action.Action -eq 'DeleteProfile') {
+                Write-NRLine ('[DELETE] {0} | risk={1}/{2}' -f $action.ProfileName,$action.RiskLevel,$action.RiskScore) 'Yellow'
+            } elseif ($action.Action -eq 'ClearNewNetworks') {
+                Write-NRLine '[REFRESH] NetworkList\NewNetworks' 'Yellow'
+            }
+        }
+        if ($plan.SkippedCandidates.Count) {
+            Write-NRLine ('[SKIP] 已跳过 {0} 个未通过安全门槛的 Profile。' -f $plan.SkippedCandidates.Count) 'Red'
+        }
     }
 
     if ($DryRun) {
         Write-NRLog 'Dry Run completed. No changes made.'
-        return [pscustomobject]@{Success=$true;Changed=0;Candidates=$plan.SafeProfileDeletions;Backup=$null;Validation=$d;Deep=[bool]$Deep;DryRun=$true;Plan=$plan}
+        return [pscustomobject]@{
+            Success=$true
+            Changed=0
+            Candidates=@($plan.SafeCandidates | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
+            Backup=$null
+            Validation=$d
+            Deep=[bool]$Deep
+            DryRun=$true
+            Plan=$plan
+        }
     }
 
-    if (-not (Confirm-NRAction -Message '将按上述计划修改网络 Profile。执行前会自动创建完整备份，继续？' -AssumeYes:$AssumeYes)) {
+    if (-not (Confirm-NRAction -Message '将按上述计划修改网络配置。执行前会自动创建完整备份，继续？' -AssumeYes:$AssumeYes)) {
         Write-NRLog 'Repair cancelled by user.' 'WARN'
-        return [pscustomobject]@{Success=$false;Changed=0;Cancelled=$true;Candidates=$plan.SafeProfileDeletions;Backup=$null;Plan=$plan}
+        return [pscustomobject]@{
+            Success=$false
+            Changed=0
+            Cancelled=$true
+            Candidates=@($plan.SafeCandidates | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
+            Backup=$null
+            Plan=$plan
+        }
     }
 
     $backup = New-NRBackup
     $changed = 0
     try {
-        foreach ($p in $safe) { Remove-NRProfile -Profile $p; $changed++ }
-        if ($Deep) { Clear-NRNewNetworks }
+        foreach ($candidate in @($plan.SafeCandidates)) {
+            Remove-NRProfile -Profile $candidate
+            $changed++
+        }
+        if ($plan.ClearNewNetworksRequested) { Clear-NRNewNetworks }
         Restart-NRNetworkServices
         $validation = Invoke-NRValidation -Before $d -SkipConnectivityTest:$SkipConnectivityTest
         if (-not $validation.Success) { throw '修复后验证失败，准备自动回滚。' }
         Write-NRLog ('Repair succeeded. Changed={0}' -f $changed)
-        [pscustomobject]@{Success=$true;Changed=$changed;Candidates=$plan.SafeProfileDeletions;Backup=$backup;Validation=$validation;Deep=[bool]$Deep;DryRun=$false;Plan=$plan}
+        [pscustomobject]@{
+            Success=$true
+            Changed=$changed
+            Candidates=@($plan.SafeCandidates | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
+            Backup=$backup
+            Validation=$validation
+            Deep=[bool]$Deep
+            DryRun=$false
+            Plan=$plan
+        }
     }
     catch {
         Write-NRLog ('Repair failed: {0}' -f $_.Exception.Message) 'ERROR'
         $restore = Restore-NRBackup -BackupPath $backup.Path -AssumeYes:$true
-        [pscustomobject]@{Success=$false;Changed=$changed;Error=$_.Exception.Message;Backup=$backup;Rollback=$restore;Plan=$plan}
+        [pscustomobject]@{
+            Success=$false
+            Changed=$changed
+            Error=$_.Exception.Message
+            Backup=$backup
+            Rollback=$restore
+            Plan=$plan
+        }
     }
 }
 
