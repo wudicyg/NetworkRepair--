@@ -74,7 +74,7 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 - **可验证性**：`-Mode GuiSmoke` 会构建完整窗口、核对关键控件与尺寸后释放，不接触系统状态也不需要管理员权限，CI 因此能真正验证界面代码可以构建。
 - **窗口化打包**：分发脚本默认 `DefaultMode = 'Gui'`，编译时传入 `-noConsole -STA -DPIAware`；控制台 TUI 由备用启动器显式以 `-Mode Menu` 进入。
 - **必须同时加 `-noOutput`**：ps2exe 在无控制台模式下会把脚本输出（`Write-Output` 与 `Write-Host` 都算）收集起来，用一个模态对话框显示，进程会一直等到用户点「确定」。实测不加该开关时，打包后的 exe 一有输出就弹窗并卡住；CI 因此用「带超时的等待 + 退出码」而不是无限等待来验证图形版启动。
-- **应用图标**：`assets/NetworkRepair.ico` 由 `tools/New-NRIcon.ps1` 生成（可重复生成，仓库里不存手改的二进制）。exe 编译时通过 `-iconFile` 嵌入；窗口图标在打包运行时用 `Icon::ExtractAssociatedIcon` 取自自身进程映像，脚本方式运行时回退到包内 `assets\NetworkRepair.ico`。小尺寸用传统 DIB 条目、大尺寸用 PNG 条目压缩，兼顾兼容性与体积。
+- **应用图标**：`assets/NetMedic.ico` 由 `tools/New-NRIcon.ps1` 生成（可重复生成，仓库里不存手改的二进制）。exe 编译时通过 `-iconFile` 嵌入；窗口图标在打包运行时用 `Icon::ExtractAssociatedIcon` 取自自身进程映像，脚本方式运行时回退到包内 `assets\NetMedic.ico`。小尺寸用传统 DIB 条目、大尺寸用 PNG 条目压缩，兼顾兼容性与体积。
 
 ## Update check
 
@@ -100,7 +100,7 @@ The write boundary remains unchanged: only explicitly eligible non-active, non-m
 
 ## Health vs. Profile hygiene
 
-NetworkRepair treats network connectivity health and Network List Profile hygiene as two independent dimensions.
+NetMedic treats network connectivity health and Network List Profile hygiene as two independent dimensions.
 
 A machine can be **Healthy** while still containing historical numbered Profiles such as `网络 2`, `网络 3`, or `Network 4`. In that case the report says the network is healthy but recommends historical Profile cleanup, and the Repair Planner may still generate safe deletion actions for inactive, non-Managed candidates.
 
@@ -113,6 +113,6 @@ When there is no historical Profile cleanup candidate and the network is healthy
 `tools/New-NRSingleFileDistribution.ps1` 把入口脚本与 `src/` 下全部模块按点源顺序压平成单个脚本：压平后的脚本在语义上与逐文件点源一致，但不再依赖 `src/` 目录，因此可以直接编译成单文件 exe。
 
 - **单文件 exe**：用 ps2exe 编译，默认嵌入 `requireAdministrator` 清单（构建后用字节搜索校验该标记确实存在）。exe 宿主中 `$MyInvocation.MyCommand` 没有 `Path` 属性，入口路径按「脚本路径 → `PSCommandPath` → 进程映像 → 应用程序域基目录」回退；提权逻辑再按宿主类型决定是重新运行入口脚本还是重启自身。
-- **备用启动器**：`备用启动\启动-网络修复工具.bat` 内容为纯 ASCII（批处理对中文内容与代码页敏感，中文只出现在文件名上），指向同一份压平脚本。
-- **发布包布局**：根目录只保留一个显眼入口 `网络修复工具.exe`，配套 `使用说明.md`；源码、文档与工具保持原有目录结构，供审计与二次开发。
+- **备用启动器**：`备用启动\启动-网络医生.bat` 内容为纯 ASCII（批处理对中文内容与代码页敏感，中文只出现在文件名上），指向同一份压平脚本。
+- **发布包布局**：根目录只保留一个显眼入口 `网络医生.exe`，配套 `使用说明.md`；源码、文档与工具保持原有目录结构，供审计与二次开发。
 - **zip 编码**：使用 `ZipFile::CreateFromDirectory` 并显式传入 UTF-8 条目名，避免中文文件名解压后变成乱码；`Compress-Archive` 不保证这一点。

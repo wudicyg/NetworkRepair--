@@ -12,7 +12,7 @@ assignees: ""
 
 ## 建议
 
-请描述希望 NetworkRepair 如何解决。
+请描述希望 NetMedic 如何解决。
 
 ## 安全影响
 

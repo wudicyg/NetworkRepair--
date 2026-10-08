@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-    生成 NetworkRepair 应用图标（多尺寸 ICO）。
+    生成 NetMedic 应用图标（多尺寸 ICO）。
 
 .DESCRIPTION
     用 System.Drawing 绘制图标并手写 ICO 容器。ICO 里使用传统的 DIB（BMP）条目而不是
@@ -11,11 +11,11 @@
     一张放大的 PNG 预览，便于人工确认图标实际长什么样。
 
 .EXAMPLE
-    .\tools\New-NRIcon.ps1 -Path .\assets\NetworkRepair.ico -PreviewPath .\icon-preview.png
+    .\tools\New-NRIcon.ps1 -Path .\assets\NetMedic.ico -PreviewPath .\icon-preview.png
 #>
 [CmdletBinding()]
 param(
-    [string]$Path = (Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\NetworkRepair.ico'),
+    [string]$Path = (Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\NetMedic.ico'),
     [int[]]$Sizes = @(16, 32, 48, 64, 128, 256),
     [int]$PngCompressionFromSize = 64,
     [string]$PreviewPath

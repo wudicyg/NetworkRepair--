@@ -91,7 +91,7 @@ function Get-NRReleaseFromAtomFeed {
         默认跳过预发布（按语义化版本后缀判断）。
     #>
     param(
-        [string]$Repository = 'wudicyg/NetworkRepair--',
+        [string]$Repository = 'wudicyg/netmedic',
         [int]$TimeoutSeconds = 10,
         [switch]$IncludePrerelease
     )
@@ -137,7 +137,7 @@ function Get-NRReleaseFromApi {
         从 REST API 读取最新发布（信息更全，但匿名调用有速率限制，只作后备）。
     #>
     param(
-        [string]$Repository = 'wudicyg/NetworkRepair--',
+        [string]$Repository = 'wudicyg/netmedic',
         [string]$ApiUrl = 'https://api.github.com',
         [int]$TimeoutSeconds = 10
     )
@@ -145,7 +145,7 @@ function Get-NRReleaseFromApi {
     $uri = '{0}/repos/{1}/releases/latest' -f $ApiUrl.TrimEnd('/'), $Repository
     $headers = @{
         Accept       = 'application/vnd.github+json'
-        'User-Agent' = 'NetworkRepair-UpdateCheck'
+        'User-Agent' = 'NetMedic-UpdateCheck'
     }
     $release = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -TimeoutSec $TimeoutSeconds
 
@@ -170,7 +170,7 @@ function Get-NRLatestRelease {
         返回结构化结果；两个数据源都失败时 Success=$false 且带 Error，绝不抛异常。
     #>
     param(
-        [string]$Repository = 'wudicyg/NetworkRepair--',
+        [string]$Repository = 'wudicyg/netmedic',
         [string]$ApiUrl = 'https://api.github.com',
         [string]$CurrentVersion,
         [int]$TimeoutSeconds = 10,

@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 concurrency:
-  group: networkrepair-release-${{ github.ref }}
+  group: netmedic-release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -64,7 +64,7 @@ jobs:
       - name: Upload release package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NetworkRepair-${{ github.ref_name }}
+          name: NetMedic-${{ github.ref_name }}
           path: |
             release/*.zip
             release/*.sha256
@@ -90,7 +90,7 @@ jobs:
             $portable.FullName
             $portableSha.FullName
             '--title'
-            "NetworkRepair $env:GITHUB_REF_NAME"
+            "NetMedic $env:GITHUB_REF_NAME"
             '--generate-notes'
             '--verify-tag'
           )

@@ -77,7 +77,7 @@ function Compare-NRRegSnapshotFiles {
 
 function Test-NRRegistrySnapshotMatch {
     param([Parameter(Mandatory)][string]$ExpectedRegistryFile)
-    $temp=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_verify_{0}.reg'-f [guid]::NewGuid().ToString('N'))
+    $temp=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_verify_{0}.reg'-f [guid]::NewGuid().ToString('N'))
     try {
         & reg.exe export 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList' $temp /y|Out-Null
         $exitCode=$LASTEXITCODE
@@ -110,7 +110,7 @@ function Test-NRRegistryScopeSnapshotMatch {
         [Parameter(Mandatory)][string]$ExpectedRegistryFile,
         [Parameter(Mandatory)][string]$RegistryPath
     )
-    $temp=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_verify_{0}.reg'-f [guid]::NewGuid().ToString('N'))
+    $temp=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_verify_{0}.reg'-f [guid]::NewGuid().ToString('N'))
     try {
         & reg.exe export $RegistryPath $temp /y|Out-Null
         $exitCode=$LASTEXITCODE
@@ -166,7 +166,7 @@ function Restore-NRBackup {
     if(-not $profilesReg){
         throw '该备份由旧版本生成，缺少 NetworkList-Profiles.reg。请先用当前版本重新创建备份后再执行 Restore。'
     }
-    if(!(Confirm-NRAction -Message ('即将恢复 NetworkRepair 管理的 Profiles/NewNetworks 范围，原始完整备份仍保留。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
+    if(!(Confirm-NRAction -Message ('即将恢复 NetMedic 管理的 Profiles/NewNetworks 范围，原始完整备份仍保留。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
 
     $preRestore=New-NRBackup -Level 'PreRestore'
     try {

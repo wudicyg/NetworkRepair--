@@ -3,7 +3,7 @@
         if (-not (Test-Path -LiteralPath $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
     }
 }
-function New-NRLogFile { Join-Path $Script:Logs ('NetworkRepair_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss_fff')) }
+function New-NRLogFile { Join-Path $Script:Logs ('NetMedic_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss_fff')) }
 function Write-NRLog {
     param([Parameter(Mandatory)][string]$Message,[ValidateSet('INFO','WARN','ERROR')][string]$Level='INFO')
     Add-Content -LiteralPath $Script:LogFile -Value ('[{0}] [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'),$Level,$Message) -Encoding UTF8

@@ -4,7 +4,7 @@
     为 GitHub Release 附件设置中文显示标签。
 
 .DESCRIPTION
-    GitHub 会剥掉附件名里的非 ASCII 字符（实测：上传「网络修复工具_1.0.0.exe」会存成「_1.0.0.exe」），
+    GitHub 会剥掉附件名里的非 ASCII 字符（实测：上传「网络医生_1.0.0.exe」会存成「_1.0.0.exe」），
     因此发布页附件名必须使用 ASCII；中文名称改由附件的 label 字段承载，在 Releases 页面展示。
 
     因为本文件包含中文字面量，必须保持 UTF-8 BOM，这样发布工作流的步骤本身可以保持纯 ASCII
@@ -31,7 +31,7 @@ if ([string]::IsNullOrWhiteSpace($Repository)) { throw '未提供 -Repository，
 if ([string]::IsNullOrWhiteSpace($Token)) { throw '未提供 -Token，也无法从 GH_TOKEN 读取。' }
 
 $labels = @(
-    [pscustomobject]@{ Match = '*Portable.exe'; Label = '网络修复工具（双击即用，免安装）' }
+    [pscustomobject]@{ Match = '*Portable.exe'; Label = '网络医生（双击即用，免安装）' }
     [pscustomobject]@{ Match = '*.zip';        Label = '完整发布包（含中文入口、使用说明与源码）' }
     [pscustomobject]@{ Match = '*.sha256';     Label = 'SHA-256 校验值' }
 )
@@ -39,7 +39,7 @@ $labels = @(
 $headers = @{
     Authorization = ('Bearer {0}' -f $Token)
     Accept        = 'application/vnd.github+json'
-    'User-Agent'  = 'networkrepair-release'
+    'User-Agent'  = 'netmedic-release'
 }
 
 $releaseUri = '{0}/repos/{1}/releases/tags/{2}' -f $ApiUrl, $Repository, $Tag

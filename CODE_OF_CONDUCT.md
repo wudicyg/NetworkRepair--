@@ -1,6 +1,6 @@
 # Code of Conduct
 
-我们希望 NetworkRepair 保持友善、技术导向和可建设性。
+我们希望 NetMedic 保持友善、技术导向和可建设性。
 
 请：
 

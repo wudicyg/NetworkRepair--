@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-    校验已构建的 NetworkRepair 发布包：内容布局、单一入口、中文文件名编码与校验值。
+    校验已构建的 NetMedic 发布包：内容布局、单一入口、中文文件名编码与校验值。
 
 .DESCRIPTION
     本脚本集中承载所有中文字面量，CI 的 run 步骤因此可以保持纯 ASCII。
@@ -18,9 +18,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$expectedEntry = '网络修复工具.exe'
+$expectedEntry = '网络医生.exe'
 $expectedQuickStart = '使用说明.md'
-$expectedLauncher = '备用启动\启动-网络修复工具.bat'
+$expectedLauncher = '备用启动\启动-网络医生.bat'
 $expectedSingleScript = 'NetworkRepair.single.ps1'
 $legacyLauncher = 'NetworkRepair.bat'
 
@@ -71,7 +71,7 @@ foreach ($expected in @($expectedEntry, $expectedQuickStart, ($expectedLauncher 
 Write-Host 'Packaged entry names verified.'
 
 # 解压后核对真实布局。
-$temp = Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepairPackageCheck_{0}' -f [guid]::NewGuid().ToString('N'))
+$temp = Join-Path ([IO.Path]::GetTempPath()) ('NetMedicPackageCheck_{0}' -f [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temp -Force | Out-Null
 try {
     Expand-Archive -LiteralPath $zip.FullName -DestinationPath $temp -Force
@@ -99,7 +99,7 @@ try {
     if ($VerifyEntryRuns) {
         $singleScript = Join-Path $root.FullName $expectedSingleScript
         $output = (& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File $singleScript -Mode Version) -join ' '
-        if ($output -notmatch 'NetworkRepair v') { throw ('单文件脚本运行输出异常：{0}' -f $output) }
+        if ($output -notmatch 'NetMedic v') { throw ('单文件脚本运行输出异常：{0}' -f $output) }
         Write-Host ('Single-file script output: {0}' -f $output)
     }
 } finally {

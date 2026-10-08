@@ -1,6 +1,6 @@
 # Security Policy
 
-NetworkRepair 具有修改 Windows 网络配置和注册表的能力。
+NetMedic 具有修改 Windows 网络配置和注册表的能力。
 
 请不要在公开 Issue 中提交：
 

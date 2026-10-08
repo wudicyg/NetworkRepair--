@@ -1,17 +1,17 @@
 ﻿# 协作流程
 
-本文件说明 NetworkRepair 的问题反馈、方案讨论、代码贡献与发布流程。目标：让每一次改动都留下可核查的证据，并始终保持 `main` 可发布。
+本文件说明 NetMedic 的问题反馈、方案讨论、代码贡献与发布流程。目标：让每一次改动都留下可核查的证据，并始终保持 `main` 可发布。
 
 ## 1. 反馈渠道分流
 
 | 你要做什么 | 去哪里 | 说明 |
 | --- | --- | --- |
-| 使用、装机、网络排查求助 | [Discussions · Q&A](https://github.com/wudicyg/NetworkRepair--/discussions/categories/q-a) | 一次性问答，不进入任务列表 |
-| 尚未成形的功能想法、方案讨论 | [Discussions · Ideas](https://github.com/wudicyg/NetworkRepair--/discussions/categories/ideas) | 讨论清楚后再开 Feature request |
-| 已能复现的缺陷 | [Issues · Bug report](https://github.com/wudicyg/NetworkRepair--/issues/new?template=bug_report.md) | 必须填写环境、复现步骤与脱敏诊断报告 |
-| 目标明确的功能请求 | [Issues · Feature request](https://github.com/wudicyg/NetworkRepair--/issues/new?template=feature_request.md) | 必须说明安全影响 |
-| 可能被利用的安全问题 | [私密安全报告](https://github.com/wudicyg/NetworkRepair--/security/advisories/new) | 不要在公开 Issue 披露利用细节，见 [SECURITY.md](../SECURITY.md) |
-| 版本发布公告 | [Discussions · Announcements](https://github.com/wudicyg/NetworkRepair--/discussions/categories/announcements) | 每个正式版发布后同步说明 |
+| 使用、装机、网络排查求助 | [Discussions · Q&A](https://github.com/wudicyg/netmedic/discussions/categories/q-a) | 一次性问答，不进入任务列表 |
+| 尚未成形的功能想法、方案讨论 | [Discussions · Ideas](https://github.com/wudicyg/netmedic/discussions/categories/ideas) | 讨论清楚后再开 Feature request |
+| 已能复现的缺陷 | [Issues · Bug report](https://github.com/wudicyg/netmedic/issues/new?template=bug_report.md) | 必须填写环境、复现步骤与脱敏诊断报告 |
+| 目标明确的功能请求 | [Issues · Feature request](https://github.com/wudicyg/netmedic/issues/new?template=feature_request.md) | 必须说明安全影响 |
+| 可能被利用的安全问题 | [私密安全报告](https://github.com/wudicyg/netmedic/security/advisories/new) | 不要在公开 Issue 披露利用细节，见 [SECURITY.md](../SECURITY.md) |
+| 版本发布公告 | [Discussions · Announcements](https://github.com/wudicyg/netmedic/discussions/categories/announcements) | 每个正式版发布后同步说明 |
 
 **Issue 只用于可执行的任务**：有明确预期行为、可验证的完成条件。开放式问题一律进 Discussions，避免 Issue 列表被讨论淹没。
 

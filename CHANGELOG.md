@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **项目更名为 NetMedic（原 NetworkRepair）**。GitHub 仓库同步改名为 `wudicyg/netmedic`；旧地址由 GitHub 自动跳转，**已发布的 1.2.0 / 1.3.0 仍能正常检查更新**（已实测旧地址的发布列表接口仍返回 200 与全部发布）。
+  - 用户可见的名字全部更新：窗口标题与启动横幅、`网络医生.exe`、`备用启动\启动-网络医生.bat`、发布产物 `NetMedic-<版本>-Portable.exe` 与 `NetMedic_<版本>_Windows.zip`、exe 文件属性里的产品名，以及发布页附件的中文标签。
+  - 更新检查内置的仓库名改为 `wudicyg/netmedic`。
+  - 为控制风险，**内部标识暂不改**：PowerShell 函数前缀 `NR-` 与模块文件名（`NetworkRepair.ps1`、`NetworkRepair.single.ps1`、`NetworkRepair.bat`、`tests\NetworkRepair.Tests.ps1`）保持原样——它们只在源码层面出现，用户看不到，改名的收益远小于巨大 diff 带来的审查与回归成本。图标资源文件改名为 `assets/NetMedic.ico`。
+  - 本文件的历史条目保持原样：它们记录的是当年真实发布过的产物名，改写等于篡改发布历史。
+
 ## [1.3.0] - 2026-10-08
 
 ### Added

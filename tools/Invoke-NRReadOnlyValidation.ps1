@@ -10,17 +10,17 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 $Src = Join-Path $Root 'src'
 
-$Script:AppName = 'NetworkRepair'
+$Script:AppName = 'NetMedic'
 $entryVersionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $Root 'NetworkRepair.ps1') -Raw -Encoding UTF8), '\$Script:AppVersion\s*=\s*''([^'']+)''')
 if (-not $entryVersionMatch.Success) {
-    throw 'Unable to determine NetworkRepair version from NetworkRepair.ps1.'
+    throw 'Unable to determine NetMedic version from NetworkRepair.ps1.'
 }
 $Script:AppVersion = $entryVersionMatch.Groups[1].Value
 $Script:Root = $Root
 $Script:Src = $Src
 $Script:Backups = Join-Path $Root 'backups'
-$Script:Logs = Join-Path $env:TEMP 'NetworkRepair-Validation'
-$Script:Reports = Join-Path $env:TEMP 'NetworkRepair-Validation'
+$Script:Logs = Join-Path $env:TEMP 'NetMedic-Validation'
+$Script:Reports = Join-Path $env:TEMP 'NetMedic-Validation'
 if (-not (Test-Path -LiteralPath $Script:Logs)) {
     New-Item -ItemType Directory -Path $Script:Logs -Force | Out-Null
 }

@@ -3,7 +3,7 @@ setlocal EnableExtensions
 chcp 65001 >nul
 cd /d "%~dp0"
 
-title NetworkRepair - Windows Network Configuration Repair
+title NetMedic - Windows Network Configuration Repair
 
 set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if not exist "%PS%" (
@@ -16,7 +16,7 @@ set "RC=%ERRORLEVEL%"
 
 if not "%RC%"=="0" (
     echo.
-    echo [ERROR] NetworkRepair exited with code %RC%.
+    echo [ERROR] NetMedic exited with code %RC%.
 )
 
 exit /b %RC%

@@ -15,7 +15,7 @@ function Test-NRInternetConnectivity {
 function Invoke-NRScan { param([switch]$SkipConnectivityTest);Write-NRLog 'Starting diagnostic scan.';$d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;if(-not $Json){Show-NRDiagnostics -Diagnostics $d};Write-NRLog ('Diagnostic scan complete. SafeCandidates={0}, HighRisk={1}'-f $d.SafeCandidateCount,$d.HighRiskCount);$d }
 function Export-NRReport {
     param([string]$Path,[switch]$SkipConnectivityTest)
-    if(!$Path){$Path=Join-Path $Script:Reports ('NetworkRepair_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
+    if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
     $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
     Write-NRLog ('Diagnostic report exported: {0}'-f $Path);[pscustomobject]@{Success=$true;Path=$Path;Diagnostics=$d}
 }

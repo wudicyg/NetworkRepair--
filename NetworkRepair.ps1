@@ -14,7 +14,7 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$Script:AppName = 'NetworkRepair'
+$Script:AppName = 'NetMedic'
 $Script:AppVersion = '1.3.0'
 # 入口路径解析：以脚本宿主（powershell.exe -File）运行时取脚本自身路径；打包成单个 exe 后
 # $MyInvocation.MyCommand 没有 Path 属性，需要退回到进程映像与应用程序基目录，否则在
@@ -57,7 +57,7 @@ $Script:LogFile = New-NRLogFile
 function Show-NRBanner {
     if ($NoColor) { $c = 'White' } else { $c = 'Cyan' }
     Write-NRLine ('=' * 68) $c
-    Write-NRLine (' NetworkRepair v{0} - Windows 网络配置诊断与修复工具' -f $Script:AppVersion) $c
+    Write-NRLine (' NetMedic v{0} - Windows 网络配置诊断与修复工具' -f $Script:AppVersion) $c
     Write-NRLine ' 安全原则：先诊断 → 先备份 → 再修改 → 最后验证' $c
     Write-NRLine ('=' * 68) $c
 }
@@ -212,7 +212,7 @@ try {
         # 图形版 exe 没有控制台：启动阶段失败必须用对话框告知，否则用户什么都看不到。
         try {
             Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-            [void][System.Windows.Forms.MessageBox]::Show(('NetworkRepair 启动失败：' + "`r`n`r`n" + $_.Exception.Message + "`r`n`r`n日志：" + $Script:LogFile), 'NetworkRepair', 'OK', 'Error')
+            [void][System.Windows.Forms.MessageBox]::Show(('NetMedic 启动失败：' + "`r`n`r`n" + $_.Exception.Message + "`r`n`r`n日志：" + $Script:LogFile), 'NetMedic', 'OK', 'Error')
         } catch { }
     }
     Write-NRLine ('[错误] {0}' -f $_.Exception.Message) 'Red'

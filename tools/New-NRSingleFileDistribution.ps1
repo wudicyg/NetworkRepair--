@@ -1,13 +1,13 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-    把 NetworkRepair 封装成面向普通用户的单文件分发：压平成单个脚本，并编译成可直接双击的 exe。
+    把 NetMedic 封装成面向普通用户的单文件分发：压平成单个脚本，并编译成可直接双击的 exe。
 
 .DESCRIPTION
     产出内容：
       NetworkRepair.single.ps1   压平后的单文件脚本（内容与 exe 相同，便于审计与排障）
-      网络修复工具.exe            单文件可执行程序（默认带 requireAdministrator 清单）
-      启动-网络修复工具.bat       备用启动器（纯 ASCII 内容，用于 exe 被安全软件拦截的情况）
+      网络医生.exe            单文件可执行程序（默认带 requireAdministrator 清单）
+      启动-网络医生.bat       备用启动器（纯 ASCII 内容，用于 exe 被安全软件拦截的情况）
 
     压平规则：把 NetworkRepair.ps1 中的 `. (Join-Path $Script:Src 'X.ps1')` 行替换为对应模块内容，
     语义与逐文件点源完全一致，但分发时不再依赖 src/ 目录。
@@ -19,10 +19,10 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist'),
-    [string]$ExecutableName = '网络修复工具.exe',
+    [string]$ExecutableName = '网络医生.exe',
     [string]$SingleScriptName = 'NetworkRepair.single.ps1',
     [string]$LauncherDirectory = '备用启动',
-    [string]$LauncherName = '启动-网络修复工具.bat',
+    [string]$LauncherName = '启动-网络医生.bat',
     [string]$LauncherScriptRelativePath = '..\NetworkRepair.single.ps1',
     [string]$CompanyName = 'wudicyg',
     [string]$Ps2ExeModulePath,
@@ -47,7 +47,7 @@ function Get-NRDistributionVersion {
     $content = Get-Content -LiteralPath $EntryPath -Raw -Encoding UTF8
     $match = [regex]::Match($content, '\$Script:AppVersion\s*=\s*''([^'']+)''')
     if (-not $match.Success -or [string]::IsNullOrWhiteSpace($match.Groups[1].Value)) {
-        throw 'Unable to determine NetworkRepair version from NetworkRepair.ps1.'
+        throw 'Unable to determine NetMedic version from NetworkRepair.ps1.'
     }
     $match.Groups[1].Value
 }
@@ -142,7 +142,7 @@ function New-NRLauncherScript {
         'setlocal'
         'set "SCRIPT=%~dp0{0}"' -f $ScriptRelativePath
         'if not exist "%SCRIPT%" ('
-        '  echo [ERROR] NetworkRepair single-file script not found: "%SCRIPT%"'
+        '  echo [ERROR] NetMedic single-file script not found: "%SCRIPT%"'
         '  echo [ERROR] Please keep this launcher inside the original package folder.'
         '  pause'
         '  exit /b 1'
@@ -155,7 +155,7 @@ function New-NRLauncherScript {
         ')'
         'if errorlevel 1 ('
         '  echo.'
-        '  echo [INFO] NetworkRepair exited with code %errorlevel%.'
+        '  echo [INFO] NetMedic exited with code %errorlevel%.'
         '  pause'
         ')'
         'endlocal'
@@ -201,15 +201,15 @@ function Test-NRExecutableEmbeddedManifest {
 }
 
 $version = Get-NRDistributionVersion -EntryPath $entryPath
-Write-Verbose ('NetworkRepair version: {0}' -f $version)
+Write-Verbose ('NetMedic version: {0}' -f $version)
 
-# 图标：默认取仓库里的 assets\NetworkRepair.ico；不存在就退回不带图标。
+# 图标：默认取仓库里的 assets\NetMedic.ico；不存在就退回不带图标。
 $resolvedIconPath = $null
 if (-not [string]::IsNullOrWhiteSpace($IconPath)) {
     if (-not (Test-Path -LiteralPath $IconPath -PathType Leaf)) { throw ('指定的图标不存在：{0}' -f $IconPath) }
     $resolvedIconPath = (Resolve-Path -LiteralPath $IconPath).Path
 } else {
-    $defaultIcon = Join-Path $Root 'assets\NetworkRepair.ico'
+    $defaultIcon = Join-Path $Root 'assets\NetMedic.ico'
     if (Test-Path -LiteralPath $defaultIcon -PathType Leaf) { $resolvedIconPath = (Resolve-Path -LiteralPath $defaultIcon).Path }
 }
 
@@ -248,9 +248,9 @@ if (-not $SkipExecutable) {
         $compileArguments = @{
             InputFile   = $singleScriptPath
             OutputFile  = $executablePath
-            Title       = 'NetworkRepair'
+            Title       = 'NetMedic'
             Description = 'Windows 网络配置诊断与修复工具'
-            Product     = 'NetworkRepair'
+            Product     = 'NetMedic'
             Version     = ('{0}.0' -f $version)
             Company     = $CompanyName
         }

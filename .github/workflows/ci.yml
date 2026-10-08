@@ -5,7 +5,7 @@ on:
   pull_request:
 
 concurrency:
-  group: networkrepair-ci-${{ github.ref }}
+  group: netmedic-ci-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -105,10 +105,10 @@ jobs:
           if (-not (Test-Path -LiteralPath $console.Executable)) { throw 'Console executable was not produced.' }
 
           $exeOutput = (& $console.Executable -Mode Version) -join ' '
-          if ($exeOutput -notmatch 'NetworkRepair v') { throw ('Unexpected console executable output: {0}' -f $exeOutput) }
+          if ($exeOutput -notmatch 'NetMedic v') { throw ('Unexpected console executable output: {0}' -f $exeOutput) }
 
           $scriptOutput = (& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $console.SingleScript -Mode Version) -join ' '
-          if ($scriptOutput -notmatch 'NetworkRepair v') { throw ('Unexpected single-file script output: {0}' -f $scriptOutput) }
+          if ($scriptOutput -notmatch 'NetMedic v') { throw ('Unexpected single-file script output: {0}' -f $scriptOutput) }
 
           Write-Host ('Console executable output: {0}' -f $exeOutput)
           Write-Host ('Single-file script output: {0}' -f $scriptOutput)
