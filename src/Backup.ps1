@@ -86,6 +86,44 @@ function Test-NRRegistrySnapshotMatch {
     finally {Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue}
 }
 
+function Resolve-NRScopedBackupFile {
+    param(
+        [Parameter(Mandatory)][string]$BackupPath,
+        [Parameter(Mandatory)][string]$ScopeName
+    )
+    $full=(Resolve-Path -LiteralPath $BackupPath -ErrorAction Stop).Path
+    $dir=$full
+    if(-not (Get-Item -LiteralPath $full).PSIsContainer){
+        $dir=Split-Path -Parent $full
+    }
+    $candidate=Join-Path $dir ('NetworkList-{0}.reg'-f $ScopeName)
+    if(-not (Test-Path -LiteralPath $candidate)){
+        return $null
+    }
+    $candidate
+}
+
+function Test-NRRegistryScopeSnapshotMatch {
+    param(
+        [Parameter(Mandatory)][string]$ExpectedRegistryFile,
+        [Parameter(Mandatory)][string]$RegistryPath
+    )
+    $temp=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_verify_{0}.reg'-f [guid]::NewGuid().ToString('N'))
+    try {
+        & reg.exe export $RegistryPath $temp /y|Out-Null
+        $exitCode=$LASTEXITCODE
+        if($exitCode -ne 0 -or -not(Test-Path -LiteralPath $temp)){
+            return [pscustomobject]@{Success=$false;Match=$false;Error=('注册表范围导出失败，reg.exe exit code={0}'-f $exitCode);ExpectedPath=$ExpectedRegistryFile}
+        }
+        $comparison=Compare-NRRegSnapshotFiles -ExpectedPath $ExpectedRegistryFile -ActualPath $temp
+        [pscustomobject]@{Success=$true;Match=$comparison.Match;Error=$null;Comparison=$comparison;ExpectedPath=$ExpectedRegistryFile}
+    } catch {
+        [pscustomobject]@{Success=$false;Match=$false;Error=$_.Exception.Message;ExpectedPath=$ExpectedRegistryFile}
+    } finally {
+        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Invoke-NRRestoreSafetyRollback {
     param([Parameter(Mandatory)]$SafetyBackup)
     $scopeMap=@(
