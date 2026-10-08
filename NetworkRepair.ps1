@@ -38,6 +38,49 @@ function Show-NRBanner {
     Write-NRLine ' 安全原则：先诊断 → 先备份 → 再修改 → 最后验证' $c
     Write-NRLine ('=' * 68) $c
 }
+function Show-NRQuickStatus {
+    try {
+        $connections = @(Get-NRConnectionProfiles)
+        $registryProfiles = @(Get-NRProfileRegistryObjects)
+        $activeNames = @($connections | Where-Object { $_.Name } | Select-Object -ExpandProperty Name -Unique)
+        $suspects = @(Get-NRSuspiciousProfiles -RegistryProfiles $registryProfiles -ActiveNames $activeNames)
+        $health = Get-NRNetworkHealthAssessment -Connections $connections -NCSI ([pscustomobject]@{
+            Skipped = $true
+            Dns = $null
+            Http = $null
+        })
+
+        $numberedProfiles = @($suspects | Where-Object {
+            if (-not $_.ProfileName) { return $false }
+            $name = ([string]$_.ProfileName).Trim()
+            if ($name -notmatch '^(网络|Network) [0-9]+') { return $false }
+            $remainder = $name -replace '^(网络|Network) [0-9]+', ''
+            return [string]::IsNullOrWhiteSpace($remainder)
+        })
+        $safeCandidates = @($numberedProfiles | Where-Object { $_.RemediationAllowed })
+        $protectedNumbered = @($numberedProfiles | Where-Object { -not $_.RemediationAllowed })
+
+        Write-NRLine ''
+        $healthColor = if ($health.Status -eq 'Healthy') { 'Green' } elseif ($health.Status -eq 'Degraded') { 'Yellow' } else { 'Red' }
+        Write-NRLine ('快速状态：网络={0} | 可安全清理历史 Profile={1} | 受保护编号 Profile={2}' -f $health.Status, $safeCandidates.Count, $protectedNumbered.Count) $healthColor
+
+        if ($health.Status -eq 'Healthy' -and $safeCandidates.Count -gt 0) {
+            Write-NRLine '提示：当前网络本身健康，但存在可安全清理的历史编号 Profile。' 'Yellow'
+        } elseif ($health.Status -eq 'Healthy' -and $safeCandidates.Count -eq 0) {
+            Write-NRLine '提示：当前网络健康且没有可安全清理的历史编号 Profile，无需进入修复。' 'Green'
+        } elseif ($safeCandidates.Count -gt 0) {
+            Write-NRLine '提示：网络状态需要进一步关注，同时存在可安全清理的历史编号 Profile。' 'Yellow'
+        } else {
+            Write-NRLine '提示：当前状态需要完整诊断后再决定下一步。' 'Yellow'
+        }
+
+        Write-NRLine '（以上为快速概览，只读且跳过 NCSI 主动探测；执行 Repair/Dry Run 前仍会重新读取状态。）' 'DarkGray'
+    }
+    catch {
+        Write-NRLine ('快速状态读取失败：{0}' -f $_.Exception.Message) 'Yellow'
+        Write-NRLine '（不影响后续完整诊断；实际操作前仍会重新检查。）' 'DarkGray'
+    }
+}
 function Show-NRMenu {
     Write-NRLine ''
     Write-NRLine '当前可用操作：' 'White'
@@ -56,6 +99,7 @@ function Invoke-NRMenu {
     do {
         Clear-Host
         Show-NRBanner
+        Show-NRQuickStatus
         Show-NRMenu
         $choice = Read-Host '请选择'
         switch ($choice) {
