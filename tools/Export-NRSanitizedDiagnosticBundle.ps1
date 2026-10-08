@@ -9,15 +9,15 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 $Src = Join-Path $Root 'src'
 
-$Script:AppName = 'NetworkRepair'
+$Script:AppName = 'NetMedic'
 $entryVersionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $Root 'NetworkRepair.ps1') -Raw -Encoding UTF8), '\$Script:AppVersion\s*=\s*''([^'']+)''')
-if (-not $entryVersionMatch.Success) { throw 'Unable to determine NetworkRepair version from NetworkRepair.ps1.' }
+if (-not $entryVersionMatch.Success) { throw 'Unable to determine NetMedic version from NetworkRepair.ps1.' }
 $Script:AppVersion = $entryVersionMatch.Groups[1].Value
 $Script:Root = $Root
 $Script:Src = $Src
 $Script:Backups = Join-Path $Root 'backups'
-$Script:Logs = Join-Path ([IO.Path]::GetTempPath()) 'NetworkRepair-Support'
-$Script:Reports = Join-Path ([IO.Path]::GetTempPath()) 'NetworkRepair-Support'
+$Script:Logs = Join-Path ([IO.Path]::GetTempPath()) 'NetMedic-Support'
+$Script:Reports = Join-Path ([IO.Path]::GetTempPath()) 'NetMedic-Support'
 if (-not (Test-Path -LiteralPath $Script:Logs)) {
     New-Item -ItemType Directory -Path $Script:Logs -Force | Out-Null
 }
@@ -145,17 +145,17 @@ function Export-NRSanitizedDiagnosticBundle {
     $json = $bundle | ConvertTo-Json -Depth 12
     if (-not $Path) {
         $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-        $Path = Join-Path $Script:Reports ('NetworkRepair_Sanitized_{0}.zip' -f $stamp)
+        $Path = Join-Path $Script:Reports ('NetMedic_Sanitized_{0}.zip' -f $stamp)
     }
 
-    $tempDir = Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_Sanitized_{0}' -f [guid]::NewGuid().ToString('N'))
+    $tempDir = Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_Sanitized_{0}' -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     try {
         $jsonPath = Join-Path $tempDir 'diagnostic.json'
         $readmePath = Join-Path $tempDir 'README.txt'
         $json | Set-Content -LiteralPath $jsonPath -Encoding UTF8
         @(
-            'NetworkRepair sanitized diagnostic bundle'
+            'NetMedic sanitized diagnostic bundle'
             ''
             'This bundle is read-only diagnostic evidence.'
             'It intentionally excludes computer name, MAC addresses, IP addresses, registry paths, NetworkId values, URLs, and credentials.'
