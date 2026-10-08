@@ -51,6 +51,16 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 
 ## 快速开始
 
+### 普通用户（推荐）
+
+从 [Releases](https://github.com/wudicyg/NetworkRepair--/releases) 下载后**双击 `网络修复工具.exe`** 即可：单文件封装、免安装，不需要在多个文件之间挑选。
+
+- 首次运行会弹出「用户账户控制」，选择「是」——本工具需要管理员权限才能读写网络配置。
+- 若 exe 被安全软件拦截，改用 `备用启动\启动-网络修复工具.bat`，效果完全相同。
+- 完整操作说明见 [使用说明.md](使用说明.md)。
+
+### 从源码运行
+
 双击：
 
 ```text
@@ -219,16 +229,34 @@ NetworkRepair/
 ├─ tools/
 │  ├─ Invoke-NRReadOnlyValidation.ps1
 │  ├─ Export-NRSanitizedDiagnosticBundle.ps1
+│  ├─ New-NRSingleFileDistribution.ps1
 │  └─ New-NRReleasePackage.ps1
 ├─ docs/
 ├─ backups/
 ├─ logs/
 ├─ README.md
+├─ 使用说明.md
 ├─ LICENSE
 ├─ CHANGELOG.md
 ├─ CONTRIBUTING.md
 └─ SECURITY.md
 ```
+
+发布包面向普通用户的布局（发布页下载的 zip 解压后）：
+
+```text
+NetworkRepair_<版本>_Windows/
+├─ 网络修复工具.exe              ← 双击这个即可
+├─ 使用说明.md                  ← 中文快速上手
+├─ 备用启动/
+│  └─ 启动-网络修复工具.bat      ← exe 被安全软件拦截时使用
+├─ NetworkRepair.single.ps1     ← 与 exe 内容相同的单文件脚本（便于审计）
+├─ NetworkRepair.ps1 + src/     ← 开发用源码入口与模块
+├─ tools/  docs/                ← 维护工具与设计文档
+└─ README.md / CHANGELOG.md / LICENSE / ...
+```
+
+发布页还会单独提供 `网络修复工具_<版本>.exe`，可直接下载、无需解压。
 
 ## 系统要求
 
