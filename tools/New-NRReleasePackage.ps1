@@ -81,7 +81,7 @@ $manifest = Join-Path $packageRoot 'RELEASE-MANIFEST.txt'
     'Excluded: .git, .github, tests, backups, logs, reports, validation runtime data, and local machine state.'
 ) | Set-Content -LiteralPath $manifest -Encoding UTF8
 
-Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $zipPath -Force
+Compress-Archive -Path $packageRoot -DestinationPath $zipPath -Force
 $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 ('{0}  {1}' -f $hash, (Split-Path -Leaf $zipPath)) | Set-Content -LiteralPath $hashPath -Encoding ASCII
 
