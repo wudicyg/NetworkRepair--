@@ -37,8 +37,8 @@
         SkippedCandidates = @($skipped)
         Actions = @($actions)
         DeleteProfileCount = @($actions | Where-Object { $_.Action -eq 'DeleteProfile' }).Count
-        ClearNewNetworksRequested = [bool](@($actions | Where-Object { $_.Action -eq 'ClearNewNetworks' }).Count)
-        RequiresBackup = [bool]$actions.Count
+        ClearNewNetworksRequested = [bool](($actions | Where-Object { $_.Action -eq 'ClearNewNetworks' }).Count -gt 0)
+        RequiresBackup = [bool]($actions.Count -gt 0)
         IsNoOp = ($actions.Count -eq 0)
     }
 }
