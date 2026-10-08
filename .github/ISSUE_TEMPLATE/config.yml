@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题与网络排查求助
+    url: https://github.com/wudicyg/NetworkRepair--/discussions/categories/q-a
+    about: 装机、使用和排查类问题请在 Discussions 的 Q&A 提问。Issue 只用于可执行的任务。
+  - name: 功能想法与方案讨论
+    url: https://github.com/wudicyg/NetworkRepair--/discussions/categories/ideas
+    about: 尚未成形的想法先在 Ideas 讨论，形成明确方案后再提交 Feature request。
+  - name: 私密报告安全问题
+    url: https://github.com/wudicyg/NetworkRepair--/security/advisories/new
+    about: 漏洞、权限提升或凭据泄露风险请走私下渠道，不要在公开 Issue 中披露。
