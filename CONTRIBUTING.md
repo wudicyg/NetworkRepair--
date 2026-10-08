@@ -1,6 +1,6 @@
 # Contributing
 
-感谢参与 NetworkRepair。完整的反馈渠道、分支命名、PR 门禁与发布流程见 [协作流程](docs/collaboration.md)。
+感谢参与 NetMedic。完整的反馈渠道、分支命名、PR 门禁与发布流程见 [协作流程](docs/collaboration.md)。
 
 ## 开发原则
 
