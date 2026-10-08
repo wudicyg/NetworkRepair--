@@ -97,14 +97,15 @@ function Invoke-NRNetworkRenameOperation {
         return [pscustomobject]@{Success=$false;Changed=$false;Cancelled=$true;NetworkId=$NetworkId;OldName=$before.Name;NewName=$NewName}
     }
 
-    $backup = New-NRBackup
+    $backup = New-NRBackup -Level 'PreRepair'
     try {
         $result = Rename-NRNetworkName -NetworkId $NetworkId -NewName $NewName -AssumeYes:$true
-        Restart-NRNetworkServices
+        $serviceRefresh = Invoke-NRServiceRefresh -Scope 'NetworkList'
+        if (-not $Json -and $serviceRefresh.Degraded) { Write-NRLine ('网络服务刷新降级：{0}' -f $serviceRefresh.Message) 'Yellow' }
         $after = Find-NRNetworkById -NetworkId $NetworkId
         if ($after.Name -ne $NewName) { throw '网络名称修改后验证失败。' }
         Write-NRLog ('Network rename succeeded: {0} -> {1}' -f $before.Name,$after.Name)
-        [pscustomobject]@{Success=$true;Changed=$true;Cancelled=$false;NetworkId=$NetworkId;OldName=$before.Name;NewName=$after.Name;Backup=$backup.Path}
+        [pscustomobject]@{Success=$true;Changed=$true;Cancelled=$false;NetworkId=$NetworkId;OldName=$before.Name;NewName=$after.Name;Backup=$backup.Path;ServiceRefresh=$serviceRefresh}
     }
     catch {
         $errorMessage = $_.Exception.Message

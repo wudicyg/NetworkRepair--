@@ -4,6 +4,11 @@
 
 ### Added
 - **多级恢复点**：备份现在带等级（`Manual` / `PreRepair` / `PreRestore`）与固定标记，新增 `src/RestorePoints.ps1` 提供恢复点列举、完整性检查、保留策略计算与显式确认后的清理；`Restore` 支持按恢复点序号恢复（`-RestorePointIndex`），新增 `-Mode RestorePoints` 与 `-Mode Prune`。安全点（PreRepair/PreRestore）与已固定恢复点享有更高保留下限，清理只允许删除备份根目录的直接子目录。
+- **更精细的服务刷新策略**：新增 `src/Services.ps1`。刷新按实际影响范围决策（没有注册表改动时跳过，不再无条件重启网络服务）、按依赖顺序重启（停止 netprofm → NlaSvc，启动反向）、在有界超时内轮询服务状态，并以 Network List Manager COM 是否恢复可用作为就绪判据，替代原先的固定 `Start-Sleep 2`；被 `-Force` 连带停止的清单外依赖服务会先记录并随后一并拉起，原本未运行/未安装的服务不主动启动。刷新结果（`Refreshed` / `NotRunning` / `Missing` / `Failed` / `Collateral` / `ComReady` / `Degraded`）会回传到修复、恢复与重命名的返回对象，降级时给出可见提示。
+- 新增 `Write-NRSafeLog`：没有日志文件上下文时（例如单元测试直接点源模块）静默跳过，避免日志写入失败打断主流程。
+
+### Changed
+- 网络重命名前的自动备份也使用 `PreRepair` 安全点等级，与修复、恢复路径保持一致，避免修改前的安全点被当作普通恢复点优先清理。
 
 ### Changed
 - 明确 Issues 与 Discussions 的分工：新增协作流程文档 `docs/collaboration.md`，Issue 模板页增加 Q&A / Ideas / 私密安全报告入口，`CONTRIBUTING.md` 补充分支命名与 PR 门禁。

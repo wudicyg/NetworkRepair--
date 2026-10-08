@@ -78,6 +78,7 @@ function Invoke-NRRepair {
     }
 
     $changed = 0
+    $newNetworksCleared = $false
     try {
         foreach ($candidate in @($plan.SafeCandidates)) {
             if (-not $Json) {
@@ -94,7 +95,7 @@ function Invoke-NRRepair {
             if (-not $Json) {
                 Write-NRLine '正在刷新 NetworkList\NewNetworks...' 'Yellow'
             }
-            Clear-NRNewNetworks
+            $newNetworksCleared = [bool](Clear-NRNewNetworks)
             if (-not $Json) {
                 Write-NRLine 'NewNetworks 刷新完成。' 'Green'
             }
@@ -103,9 +104,17 @@ function Invoke-NRRepair {
         if (-not $Json) {
             Write-NRLine '正在重启相关网络服务，请稍候...' 'Cyan'
         }
-        Restart-NRNetworkServices
+        $refreshScope = 'Skip'
+        if ($changed -gt 0 -or $newNetworksCleared) { $refreshScope = 'NetworkList' }
+        $serviceRefresh = Invoke-NRServiceRefresh -Scope $refreshScope
         if (-not $Json) {
-            Write-NRLine '网络服务处理完成。' 'Green'
+            if ($serviceRefresh.Required) {
+                $refreshColor = 'Green'
+                if ($serviceRefresh.Degraded) { $refreshColor = 'Yellow' }
+                Write-NRLine ('网络服务刷新：{0}' -f $serviceRefresh.Message) $refreshColor
+            } else {
+                Write-NRLine '未修改 NetworkList 注册表范围，已跳过网络服务刷新。' 'DarkGray'
+            }
             Write-NRLine '正在进行修复后验证，请稍候...' 'Cyan'
         }
 
@@ -133,6 +142,7 @@ function Invoke-NRRepair {
             Candidates=@($plan.SafeCandidates | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
             Backup=$backup
             Validation=$validation
+            ServiceRefresh=$serviceRefresh
             Deep=[bool]$Deep
             Plan=$plan
             Decision=$decision
@@ -177,18 +187,4 @@ function Clear-NRNewNetworks {
     try { Remove-ItemProperty -LiteralPath $path -Name 'NetworkList' -ErrorAction SilentlyContinue } catch { }
 }
 
-function Restart-NRNetworkServices {
-    foreach ($name in @('NlaSvc','netprofm')) {
-        $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
-        if (-not $svc) { continue }
-        try {
-            if ($svc.Status -eq 'Running') {
-                Write-NRLog ('Restarting service: {0}' -f $name)
-                Restart-Service -Name $name -Force -ErrorAction Stop
-            }
-        } catch {
-            Write-NRLog ('Could not restart {0}: {1}' -f $name,$_.Exception.Message) 'WARN'
-        }
-    }
-    Start-Sleep -Seconds 2
-}
+

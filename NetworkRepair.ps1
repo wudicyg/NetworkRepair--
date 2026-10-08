@@ -29,6 +29,7 @@ $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'Ncsi.ps1')
 . (Join-Path $Script:Src 'Backup.ps1')
 . (Join-Path $Script:Src 'RestorePoints.ps1')
+. (Join-Path $Script:Src 'Services.ps1')
 . (Join-Path $Script:Src 'Repair.ps1')
 . (Join-Path $Script:Src 'Validation.ps1')
 Initialize-NRPaths
