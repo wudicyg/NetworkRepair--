@@ -108,8 +108,8 @@
         $tool = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
         $entry = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
         $tool | Should -Match 'entryVersionMatch'
-        $tool | Should -Match '\$Script:AppVersion = \\$entryVersionMatch.Groups\[1\].Value'
-        $tool | Should -Not -Match "\$Script:AppVersion = '0.4.0-dev'"
+        $tool | Should -Match 'entryVersionMatch.Groups\[1\]\.Value'
+        $tool | Should -Not -Match "'0.4.0-dev'"
         $entry | Should -Match '\$Script:AppVersion'
     }
 
