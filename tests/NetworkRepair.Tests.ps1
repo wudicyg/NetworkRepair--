@@ -196,6 +196,44 @@
         $content | Should -Match ([regex]::Escape('& reg.exe import $file'))
     }
 
+    It 'resolves scoped restore files from a backup directory or NetworkList.reg path' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_scope_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            $full=Join-Path $dir 'NetworkList.reg'
+            $profiles=Join-Path $dir 'NetworkList-Profiles.reg'
+            $newNetworks=Join-Path $dir 'NetworkList-NewNetworks.reg'
+            @('full') | Set-Content -LiteralPath $full -Encoding UTF8
+            @('profiles') | Set-Content -LiteralPath $profiles -Encoding UTF8
+            @('new-networks') | Set-Content -LiteralPath $newNetworks -Encoding UTF8
+
+            Resolve-NRScopedBackupFile -BackupPath $dir -ScopeName 'Profiles' | Should -Be $profiles
+            Resolve-NRScopedBackupFile -BackupPath $dir -ScopeName 'NewNetworks' | Should -Be $newNetworks
+            Resolve-NRScopedBackupFile -BackupPath $full -ScopeName 'Profiles' | Should -Be $profiles
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'rejects legacy full-tree backups that lack scoped restore files' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_legacy_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            @('full') | Set-Content -LiteralPath (Join-Path $dir 'NetworkList.reg') -Encoding UTF8
+            Resolve-NRScopedBackupFile -BackupPath $dir -ScopeName 'Profiles' | Should -BeNullOrEmpty
+            Resolve-NRScopedBackupFile -BackupPath $dir -ScopeName 'NewNetworks' | Should -BeNullOrEmpty
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'treats NewNetworks as optional when the scoped backup file is absent' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_optional_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            @('full') | Set-Content -LiteralPath (Join-Path $dir 'NetworkList.reg') -Encoding UTF8
+            @('profiles') | Set-Content -LiteralPath (Join-Path $dir 'NetworkList-Profiles.reg') -Encoding UTF8
+            Resolve-NRScopedBackupFile -BackupPath $dir -ScopeName 'Profiles' | Should -Not -BeNullOrEmpty
+            Resolve-NRScopedBackupFile -BackupPath $dir -ScopeName 'NewNetworks' | Should -BeNullOrEmpty
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
     It 'compares registry snapshots canonically across ordering and registry-name casing' {
         $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_test_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
