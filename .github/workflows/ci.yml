@@ -96,3 +96,15 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
           }
+
+      - name: Validate release workflow safety
+        run: |
+          if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern 'RELEASE_IS_PRERELEASE' -Quiet)) {
+            throw 'Release workflow prerelease detection is missing.'
+          }
+          if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern '--prerelease' -Quiet)) {
+            throw 'Release workflow prerelease publishing guard is missing.'
+          }
+          if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern '--verify-tag' -Quiet)) {
+            throw 'Release workflow tag verification is missing.'
+          }
