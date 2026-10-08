@@ -1,11 +1,13 @@
-﻿$root = Split-Path -Parent $PSScriptRoot
-. (Join-Path $root 'src\Common.ps1')
-. (Join-Path $root 'src\NetworkListManager.ps1')
-. (Join-Path $root 'src\NetworkIdentity.ps1')
-. (Join-Path $root 'src\Ncsi.ps1')
-. (Join-Path $root 'src\Diagnostics.ps1')
+﻿Describe 'NetworkRepair test suite' {
+    BeforeAll {
+        $root = Split-Path -Parent $PSScriptRoot
+        . (Join-Path $root 'src\Common.ps1')
+        . (Join-Path $root 'src\NetworkListManager.ps1')
+        . (Join-Path $root 'src\NetworkIdentity.ps1')
+        . (Join-Path $root 'src\Ncsi.ps1')
+        . (Join-Path $root 'src\Diagnostics.ps1')
+    }
 
-Describe 'NetworkRepair safety rules' {
     It 'marks an inactive Chinese numbered profile as Low and removable' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 3';Category=0;Managed=0;RegistryPath='HKLM:\dummy';LastWrite=(Get-Date)}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
@@ -43,9 +45,7 @@ Describe 'NetworkRepair safety rules' {
         $r.RemediationAllowed | Should -BeFalse
         $r.DiagnosticCodes | Should -Contain 'NR1003'
     }
-}
 
-Describe 'NetworkRepair v0.2.0 helper behavior' {
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
     }
@@ -53,10 +53,7 @@ Describe 'NetworkRepair v0.2.0 helper behavior' {
     It 'exposes Network List Manager diagnostic reader' {
         (Get-Command Get-NRNetworkListManagerNetworks -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
     }
-}
 
-
-Describe 'Network identity safety' {
     It 'normalizes GUID values consistently' {
         (Normalize-NRGuidKey -Value '{12345678-1234-1234-1234-123456789ABC}') | Should -Be '12345678-1234-1234-1234-123456789abc'
     }
