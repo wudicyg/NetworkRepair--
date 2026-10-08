@@ -63,6 +63,18 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 - **不扩大修改范围**：原本未运行或未安装的服务不会被主动启动，只如实记录。
 - **结果回传**：刷新返回结构化结果（`Refreshed` / `NotRunning` / `Missing` / `Failed` / `Collateral` / `ComReady` / `Degraded`），修复、恢复与重命名都会把它带进各自的返回对象，降级时给出可见提示。
 
+## Graphical interface
+
+`src/Gui.ps1` 在既有能力之上加了一层 WinForms 界面，通过 `-Mode Gui` 进入；打包后的 exe 默认就是它。
+
+- **不新增修改边界**：界面只调用既有函数。修复候选仍由 `RemediationAllowed` 等安全门槛决定，点击修复前仍弹出本次修复计划并要求确认，验证与自动回滚路径完全不变。
+- **逻辑与界面分离**：状态卡文案（`Get-NRGuiStatusCards`）、修复计划摘要（`Get-NRGuiPlanSummary`）、按钮可用性（`Get-NRGuiActionAvailability`）都是纯函数，可在无界面环境下单测；窗口构建（`New-NRGuiForm`）与显示（`Show-NRGui`）分离，后者才真正进入消息循环。
+- **程序集延迟加载**：只有构建窗口时才加载 `System.Windows.Forms` / `System.Drawing`，命令行与 CI 路径不受影响。
+- **无控制台环境适配**：图形版 exe 没有控制台，界面自己渲染日志，并把 `$Json` 置为静默分支，避免向不存在的控制台写内容；启动阶段异常改用对话框呈现。
+- **可验证性**：`-Mode GuiSmoke` 会构建完整窗口、核对关键控件与尺寸后释放，不接触系统状态也不需要管理员权限，CI 因此能真正验证界面代码可以构建。
+- **窗口化打包**：分发脚本默认 `DefaultMode = 'Gui'`，编译时传入 `-noConsole -STA -DPIAware`；控制台 TUI 由备用启动器显式以 `-Mode Menu` 进入。
+- **必须同时加 `-noOutput`**：ps2exe 在无控制台模式下会把脚本输出（`Write-Output` 与 `Write-Host` 都算）收集起来，用一个模态对话框显示，进程会一直等到用户点「确定」。实测不加该开关时，打包后的 exe 一有输出就弹窗并卡住；CI 因此用「带超时的等待 + 退出码」而不是无限等待来验证图形版启动。
+
 ## Diagnostic layers
 
 - Connection Profile

@@ -99,15 +99,31 @@ jobs:
           }
       - name: Verify single-file entry actually runs
         run: |
-          $result = & .\tools\New-NRSingleFileDistribution.ps1 -OutputDirectory .\dist-check -NoElevationManifest | ConvertFrom-Json
-          if (-not $result.Success) { throw ('Single-file distribution build failed: {0}' -f $result.ExecutableError) }
-          if (-not (Test-Path -LiteralPath $result.Executable)) { throw 'Executable entry was not produced.' }
+          # Console build: stdout is observable, so the version banner can be asserted.
+          $console = & .\tools\New-NRSingleFileDistribution.ps1 -OutputDirectory .\dist-console -Console -NoElevationManifest | ConvertFrom-Json
+          if (-not $console.Success) { throw ('Console distribution build failed: {0}' -f $console.ExecutableError) }
+          if (-not (Test-Path -LiteralPath $console.Executable)) { throw 'Console executable was not produced.' }
 
-          $exeOutput = (& $result.Executable -Mode Version) -join ' '
-          if ($exeOutput -notmatch 'NetworkRepair v') { throw ('Unexpected executable output: {0}' -f $exeOutput) }
+          $exeOutput = (& $console.Executable -Mode Version) -join ' '
+          if ($exeOutput -notmatch 'NetworkRepair v') { throw ('Unexpected console executable output: {0}' -f $exeOutput) }
 
-          $scriptOutput = (& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $result.SingleScript -Mode Version) -join ' '
+          $scriptOutput = (& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $console.SingleScript -Mode Version) -join ' '
           if ($scriptOutput -notmatch 'NetworkRepair v') { throw ('Unexpected single-file script output: {0}' -f $scriptOutput) }
 
-          Write-Host ('Executable entry output: {0}' -f $exeOutput)
+          Write-Host ('Console executable output: {0}' -f $exeOutput)
           Write-Host ('Single-file script output: {0}' -f $scriptOutput)
+
+      - name: Verify graphical executable builds and starts
+        run: |
+          # Windowed build (the shipped one): no console, so readiness is proven by exit code.
+          $gui = & .\tools\New-NRSingleFileDistribution.ps1 -OutputDirectory .\dist-gui -NoElevationManifest | ConvertFrom-Json
+          if (-not $gui.Success) { throw ('Graphical distribution build failed: {0}' -f $gui.ExecutableError) }
+          if ($gui.DefaultMode -ne 'Gui') { throw ('Graphical build default mode is not Gui: {0}' -f $gui.DefaultMode) }
+
+          $process = Start-Process -FilePath $gui.Executable -ArgumentList '-Mode','GuiSmoke' -PassThru
+          if (-not $process.WaitForExit(120000)) {
+            Stop-Process -Id $process.Id -Force
+            throw 'Graphical executable did not exit within 120s: a modal output dialog is likely blocking it.'
+          }
+          if ($process.ExitCode -ne 0) { throw ('Graphical interface smoke test failed with exit code {0}.' -f $process.ExitCode) }
+          Write-Host 'Graphical interface smoke test passed.'

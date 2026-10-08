@@ -10,6 +10,7 @@
         . (Join-Path $root 'src\Backup.ps1')
         . (Join-Path $root 'src\RestorePoints.ps1')
         . (Join-Path $root 'src\Services.ps1')
+        . (Join-Path $root 'src\Gui.ps1')
 
         function New-TestRestorePoint {
             param(
@@ -887,5 +888,92 @@
 
         $release = Get-Content -LiteralPath (Join-Path $root '.github\workflows\release.yml') -Raw -Encoding UTF8
         $release | Should -Match ([regex]::Escape('Set-NRReleaseAssetLabels.ps1'))
+    }
+
+    It 'avoids the PowerShell 5.1 generic list of object trap' {
+        # @(List[object]) 在 Windows PowerShell 5.1 下会抛「Argument types do not match /
+        # 参数类型不匹配」。这个坑在仓库里已经踩中两次，直接禁止该写法，改用普通数组。
+        $offenders = @()
+        foreach ($file in @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.ps1 | Where-Object { $_.FullName -notmatch '\\(backups|logs|reports)\\' })) {
+            $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
+            if ($content -match 'System\.Collections\.Generic\.List\[object\]') { $offenders += $file.FullName.Substring($root.Length + 1) }
+        }
+        $offenders.Count | Should -Be 0 -Because ('这些文件使用了 List[object]：' + ($offenders -join ', '))
+    }
+
+    It 'wires the graphical interface into the entry script' {
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match ([regex]::Escape("'Gui'"))
+        $entry | Should -Match ([regex]::Escape("'GuiSmoke'"))
+        $entry | Should -Match ([regex]::Escape('Gui.ps1'))
+        $entry | Should -Match 'Show-NRGui'
+        $entry | Should -Match 'Invoke-NRGuiSmokeTest'
+        # 自检模式必须在提权之前返回，CI 才能在没有管理员权限时验证界面代码。
+        $smokeIndex = $entry.IndexOf("if (`$Mode -eq 'GuiSmoke')")
+        $adminIndex = $entry.IndexOf('Assert-NRAdministrator')
+        $smokeIndex | Should -BeGreaterThan 0
+        $adminIndex | Should -BeGreaterThan $smokeIndex
+
+        $gui = Get-Content -LiteralPath (Join-Path $root 'src\Gui.ps1') -Raw -Encoding UTF8
+        foreach ($function in @('Show-NRGui','Invoke-NRGuiSmokeTest','New-NRGuiForm','Get-NRGuiStatusCards','Get-NRGuiPlanSummary')) {
+            $gui | Should -Match ([regex]::Escape('function ' + $function))
+        }
+    }
+
+    It 'builds the graphical form in a headless smoke test' {
+        $smoke = Invoke-NRGuiSmokeTest
+        $smoke.Success | Should -BeTrue -Because ([string]$smoke.Error)
+        $smoke.ControlCount | Should -BeGreaterThan 20
+        @($smoke.ZeroSizedControls).Count | Should -Be 0
+        $smoke.NamedControls | Should -Contain 'btnSafeRepair'
+        $smoke.NamedControls | Should -Contain 'btnRestorePoints'
+        $smoke.NamedControls | Should -Contain 'logBox'
+    }
+
+    It 'describes status cards and the repair plan without a user interface' {
+        $diagnostics = [pscustomobject]@{
+            NetworkHealth      = [pscustomobject]@{ Status = 'Healthy'; Reason = 'NCSI 正常' }
+            Connections        = @([pscustomobject]@{ Name = '以太网' })
+            ActiveProfileNames = @('以太网')
+            SafeCandidateCount = 2
+            HighRiskCount      = 1
+            DiagnosticsErrors  = @()
+        }
+        $restoreSummary = [pscustomobject]@{ Total = 4; PreRepair = 2; PreRestore = 1; Pinned = 1; PruneCandidates = 0 }
+
+        $cards = @(Get-NRGuiStatusCards -Diagnostics $diagnostics -RestorePointSummary $restoreSummary)
+        $cards.Count | Should -Be 5
+        ($cards | Where-Object { $_.Title -eq '网络健康度' }).Value | Should -Be 'Healthy'
+        ($cards | Where-Object { $_.Title -eq '可安全清理' }).Value | Should -Be '2 个'
+        ($cards | Where-Object { $_.Title -eq '恢复点' }).Value | Should -Be '4 个'
+        ($cards | Where-Object { $_.Title -eq '恢复点' }).Detail | Should -Match '安全点 3 个'
+        ($cards | Where-Object { $_.Title -eq '诊断完整性' }).Severity | Should -Be 'Ok'
+
+        $plan = [pscustomobject]@{
+            Actions = @(
+                [pscustomobject]@{ Action = 'DeleteProfile'; ProfileName = '网络 3'; RiskLevel = 'Low' }
+                [pscustomobject]@{ Action = 'ClearNewNetworks' }
+            )
+            ClearNewNetworksRequested = $true
+        }
+        $text = Get-NRGuiPlanSummary -Plan $plan -Deep
+        $text | Should -Match '深度修复'
+        $text | Should -Match '网络 3'
+        $text | Should -Match 'NewNetworks'
+        $text | Should -Match '将删除 1 个 Profile'
+        $text | Should -Match '自动回滚'
+
+        (Get-NRGuiActionAvailability -Busy).SafeRepair | Should -BeFalse
+        (Get-NRGuiActionAvailability).SafeRepair | Should -BeTrue
+    }
+
+    It 'defaults the packaged executable to the graphical interface' {
+        $tool = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -Raw -Encoding UTF8
+        $tool | Should -Match ([regex]::Escape("[string]`$DefaultMode = 'Gui'"))
+        $tool | Should -Match 'NoConsole'
+        # ps2exe 在无控制台模式下会把脚本输出变成模态对话框并阻塞进程，图形版必须同时加 -noOutput。
+        $tool | Should -Match 'NoOutput'
+        # 备用启动器必须显式回到控制台 TUI，否则控制台入口会消失。
+        $tool | Should -Match ([regex]::Escape('-Mode Menu'))
     }
 }

@@ -26,6 +26,8 @@ param(
     [string]$LauncherScriptRelativePath = '..\NetworkRepair.single.ps1',
     [string]$CompanyName = 'wudicyg',
     [string]$Ps2ExeModulePath,
+    [string]$DefaultMode = 'Gui',
+    [switch]$Console,
     [switch]$NoElevationManifest,
     [switch]$SkipExecutable,
     [switch]$PreserveOutputDirectory
@@ -52,7 +54,8 @@ function Get-NRDistributionVersion {
 function Merge-NRSingleFileScript {
     param(
         [Parameter(Mandatory)][string]$EntryPath,
-        [Parameter(Mandatory)][string]$SourceDirectory
+        [Parameter(Mandatory)][string]$SourceDirectory,
+        [string]$DefaultMode = 'Menu'
     )
 
     $entryText = [IO.File]::ReadAllText($EntryPath, [Text.Encoding]::UTF8)
@@ -61,13 +64,23 @@ function Merge-NRSingleFileScript {
 
     # 用单引号字符串：正则需要字面量 \$，写在双引号里会被 PowerShell 吃掉转义反斜杠。
     $dotSourcePattern = '^\.\s*\(Join-Path\s+\$Script:Src ''([^'']+)''\)\s*$'
+    $modePattern = '^(\s*\[string\]\$Mode\s*=\s*)''([^'']+)''(.*)$'
     $builder = New-Object System.Text.StringBuilder
     $inlinedModules = @()
     $missingModules = @()
+    $modeRewritten = $false
 
     foreach ($line in ($entryText -split "`r?`n")) {
         $match = [regex]::Match($line, $dotSourcePattern)
         if (-not $match.Success) {
+            # 分发版本把入口的默认模式改写为目标模式：图形版 exe 默认直接开界面，
+            # 控制台 TUI 由备用启动器显式传 -Mode Menu 进入。
+            $modeMatch = [regex]::Match($line, $modePattern)
+            if ($modeMatch.Success) {
+                [void]$builder.AppendLine($modeMatch.Groups[1].Value + "'" + $DefaultMode + "'" + $modeMatch.Groups[3].Value)
+                $modeRewritten = $true
+                continue
+            }
             [void]$builder.AppendLine($line)
             continue
         }
@@ -94,11 +107,15 @@ function Merge-NRSingleFileScript {
     if ($inlinedModules.Count -eq 0) {
         throw '没有内联任何模块，入口脚本的点源结构可能已经变化。'
     }
+    if (-not $modeRewritten) {
+        throw ('未能改写入口脚本的默认模式（目标：{0}），入口参数结构可能已经变化。' -f $DefaultMode)
+    }
 
     $header = @(
         '# =========================================================================='
         '# 本文件由 tools/New-NRSingleFileDistribution.ps1 自动生成，请勿手工修改。'
         '# 来源：NetworkRepair.ps1 + src/ 下的模块（按入口脚本的点源顺序压平）。'
+        ('# 默认模式：{0}（控制台 TUI 请显式使用 -Mode Menu）' -f $DefaultMode)
         ('# 生成时间：{0}' -f (Get-Date).ToString('o'))
         '# =========================================================================='
         ''
@@ -107,6 +124,7 @@ function Merge-NRSingleFileScript {
     [pscustomobject]@{
         Text           = ($header + $newLine + $builder.ToString())
         InlinedModules = @($inlinedModules)
+        DefaultMode    = $DefaultMode
         NewLine        = $(if ($newLine -eq "`r`n") { 'CRLF' } else { 'LF' })
     }
 }
@@ -128,7 +146,12 @@ function New-NRLauncherScript {
         '  pause'
         '  exit /b 1'
         ')'
-        'powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" %*'
+        'rem The packaged script defaults to the graphical interface; this fallback opens the console UI.'
+        'if "%~1"=="" ('
+        '  powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" -Mode Menu'
+        ') else ('
+        '  powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" %*'
+        ')'
         'if errorlevel 1 ('
         '  echo.'
         '  echo [INFO] NetworkRepair exited with code %errorlevel%.'
@@ -184,7 +207,7 @@ if ((Test-Path -LiteralPath $OutputDirectory) -and -not $PreserveOutputDirectory
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
-$merge = Merge-NRSingleFileScript -EntryPath $entryPath -SourceDirectory $sourceDirectory
+$merge = Merge-NRSingleFileScript -EntryPath $entryPath -SourceDirectory $sourceDirectory -DefaultMode $DefaultMode
 $singleScriptPath = Join-Path $OutputDirectory $SingleScriptName
 [IO.File]::WriteAllText($singleScriptPath, $merge.Text, (New-Object Text.UTF8Encoding($true)))
 
@@ -221,6 +244,16 @@ if (-not $SkipExecutable) {
             Company     = $CompanyName
         }
         if (-not $NoElevationManifest) { $compileArguments.RequireAdmin = $true }
+        if (-not $Console) {
+            # 图形版：没有控制台窗口，按 STA + DPI 感知运行 WinForms。
+            # 必须同时加 -noOutput：ps2exe 在无控制台模式下会把脚本输出（Write-Output 与
+            # Write-Host 都算）收集起来，用一个模态对话框显示，进程会一直等到用户点「确定」。
+            # 实测：不加 -noOutput 时，打包后的 exe 一有输出就弹窗并卡住。
+            $compileArguments.NoConsole = $true
+            $compileArguments.NoOutput = $true
+            $compileArguments.STA = $true
+            $compileArguments.DPIAware = $true
+        }
 
         Invoke-ps2exe @compileArguments | Out-Null
         if (-not (Test-Path -LiteralPath $executablePath)) { throw 'exe 编译未产出文件。' }
@@ -245,6 +278,8 @@ if (-not $SkipExecutable) {
     SingleScriptBytes     = (Get-Item -LiteralPath $singleScriptPath).Length
     InlinedModules        = $merge.InlinedModules
     InlinedModuleCount    = @($merge.InlinedModules).Count
+    DefaultMode           = $merge.DefaultMode
+    Windowed              = (-not $Console)
     Launcher              = $launcherPath
     Executable            = $executablePath
     ExecutableBytes       = $(if ($executablePath) { (Get-Item -LiteralPath $executablePath).Length } else { 0 })

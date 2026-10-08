@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','RestorePoints','Prune','Report','Rename','Version')]
+    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','RestorePoints','Prune','Report','Rename','Gui','GuiSmoke','Version')]
     [string]$Mode = 'Menu',
     [string]$BackupPath,
     [int]$RestorePointIndex = 0,
@@ -50,6 +50,7 @@ $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'Services.ps1')
 . (Join-Path $Script:Src 'Repair.ps1')
 . (Join-Path $Script:Src 'Validation.ps1')
+. (Join-Path $Script:Src 'Gui.ps1')
 Initialize-NRPaths
 $Script:LogFile = New-NRLogFile
 function Show-NRBanner {
@@ -159,6 +160,13 @@ function Invoke-NRMenu {
 function Pause-NR { if (-not $Json) { [void](Read-Host '按 Enter 继续') } }
 try {
     if ($Mode -eq 'Version') { Write-Output (('{0} v{1}' -f $Script:AppName, $Script:AppVersion)); exit 0 }
+    if ($Mode -eq 'GuiSmoke') {
+        # 供 CI 与无交互环境验证界面代码可以真正构建：不接触系统状态，因此不需要管理员权限。
+        $smoke = Invoke-NRGuiSmokeTest
+        if ($Json) { $smoke | ConvertTo-Json -Depth 5 } else { Write-Output (('GUI smoke: Success={0}, Controls={1}, Error={2}' -f $smoke.Success, $smoke.ControlCount, $smoke.Error)) }
+        if (-not $smoke.Success) { exit 3 }
+        exit 0
+    }
     $relaunch = New-Object System.Collections.Generic.List[string]
     [void]$relaunch.Add('-Mode'); [void]$relaunch.Add($Mode)
     if ($BackupPath) { [void]$relaunch.Add('-BackupPath'); [void]$relaunch.Add(('"{0}"' -f ($BackupPath -replace '"','\"'))) }
@@ -187,10 +195,18 @@ try {
         'RestorePoints' { $r = Get-NRRestorePointSummary; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Show-NRRestorePointList -RestorePoints $r.Points; Write-NRLine ('恢复点总数 {0}，超出保留额度 {1} 个。' -f $r.Total, $r.PruneCandidates) 'DarkGray' } }
         'Prune' { $plan = Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints); Show-NRRestorePointPlan -Plan $plan; $r = Invoke-NRRestorePointPrune -Plan $plan -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine $r.Message 'Green' }; if (-not $r.Success) { exit 8 } }
         'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
+        'Gui' { Show-NRGui }
     }
     exit 0
 } catch {
     Write-NRLog ('FATAL: {0}' -f $_.Exception.Message) 'ERROR'
+    if ($Mode -eq 'Gui') {
+        # 图形版 exe 没有控制台：启动阶段失败必须用对话框告知，否则用户什么都看不到。
+        try {
+            Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+            [void][System.Windows.Forms.MessageBox]::Show(('NetworkRepair 启动失败：' + "`r`n`r`n" + $_.Exception.Message + "`r`n`r`n日志：" + $Script:LogFile), 'NetworkRepair', 'OK', 'Error')
+        } catch { }
+    }
     Write-NRLine ('[错误] {0}' -f $_.Exception.Message) 'Red'
     Write-NRLine ('日志：{0}' -f $Script:LogFile) 'Yellow'
     if ($Json) { [pscustomobject]@{ Success = $false; Error = $_.Exception.Message; Log = $Script:LogFile } | ConvertTo-Json -Depth 4 }
