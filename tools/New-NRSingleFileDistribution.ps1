@@ -26,6 +26,7 @@ param(
     [string]$LauncherScriptRelativePath = '..\NetworkRepair.single.ps1',
     [string]$CompanyName = 'wudicyg',
     [string]$Ps2ExeModulePath,
+    [string]$IconPath,
     [string]$DefaultMode = 'Gui',
     [switch]$Console,
     [switch]$NoElevationManifest,
@@ -202,6 +203,16 @@ function Test-NRExecutableEmbeddedManifest {
 $version = Get-NRDistributionVersion -EntryPath $entryPath
 Write-Verbose ('NetworkRepair version: {0}' -f $version)
 
+# 图标：默认取仓库里的 assets\NetworkRepair.ico；不存在就退回不带图标。
+$resolvedIconPath = $null
+if (-not [string]::IsNullOrWhiteSpace($IconPath)) {
+    if (-not (Test-Path -LiteralPath $IconPath -PathType Leaf)) { throw ('指定的图标不存在：{0}' -f $IconPath) }
+    $resolvedIconPath = (Resolve-Path -LiteralPath $IconPath).Path
+} else {
+    $defaultIcon = Join-Path $Root 'assets\NetworkRepair.ico'
+    if (Test-Path -LiteralPath $defaultIcon -PathType Leaf) { $resolvedIconPath = (Resolve-Path -LiteralPath $defaultIcon).Path }
+}
+
 if ((Test-Path -LiteralPath $OutputDirectory) -and -not $PreserveOutputDirectory) {
     Remove-Item -LiteralPath $OutputDirectory -Recurse -Force
 }
@@ -244,6 +255,10 @@ if (-not $SkipExecutable) {
             Company     = $CompanyName
         }
         if (-not $NoElevationManifest) { $compileArguments.RequireAdmin = $true }
+        if ($resolvedIconPath) {
+            # 图标随 exe 一起分发：任务栏、资源管理器和窗口标题栏都用它。
+            $compileArguments.IconFile = $resolvedIconPath
+        }
         if (-not $Console) {
             # 图形版：没有控制台窗口，按 STA + DPI 感知运行 WinForms。
             # 必须同时加 -noOutput：ps2exe 在无控制台模式下会把脚本输出（Write-Output 与
@@ -280,6 +295,7 @@ if (-not $SkipExecutable) {
     InlinedModuleCount    = @($merge.InlinedModules).Count
     DefaultMode           = $merge.DefaultMode
     Windowed              = (-not $Console)
+    Icon                  = $resolvedIconPath
     Launcher              = $launcherPath
     Executable            = $executablePath
     ExecutableBytes       = $(if ($executablePath) { (Get-Item -LiteralPath $executablePath).Length } else { 0 })
