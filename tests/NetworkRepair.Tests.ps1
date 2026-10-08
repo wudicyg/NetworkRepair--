@@ -181,8 +181,8 @@
     It 'keeps Restore scoped to Profiles and NewNetworks' {
         $path = Join-Path $root 'src\Backup.ps1'
         $content = Get-Content -LiteralPath $path -Raw -Encoding UTF8
-        $content | Should -Match 'Resolve-NRScopedBackupFile'
-        $content | Should -Match 'Test-NRRegistryScopeSnapshotMatch'
+        $content | Should -Match 'function Resolve-NRScopedBackupFile\s*\{'
+        $content | Should -Match 'function Test-NRRegistryScopeSnapshotMatch\s*\{'
         $content | Should -Not -Match ([regex]::Escape('& reg.exe import $reg'))
         $content | Should -Match 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\Profiles'
         $content | Should -Match 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\NewNetworks'
