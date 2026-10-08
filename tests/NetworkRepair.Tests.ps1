@@ -10,6 +10,14 @@
         . (Join-Path $root 'src\Backup.ps1')
     }
 
+    It 'returns null for missing optional registry properties' {
+        $p=[pscustomobject]@{ProfileName='Network 9'}
+        (Get-NRPropertyValue -InputObject $p -Name 'Managed') | Should -BeNullOrEmpty
+        (Get-NRPropertyValue -InputObject $p -Name 'Category') | Should -BeNullOrEmpty
+        (Get-NRPropertyValue -InputObject $p -Name 'Description') | Should -BeNullOrEmpty
+        (Get-NRPropertyValue -InputObject $p -Name 'ProfileName') | Should -Be 'Network 9'
+    }
+
     It 'accepts registry profile input without LastWriteTime metadata' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 9';Category=0;Managed=0;RegistryPath='HKLM:\\dummy'}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
