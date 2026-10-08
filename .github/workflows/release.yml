@@ -25,7 +25,7 @@ jobs:
       - name: Verify tag matches application version
         run: |
           $content = Get-Content .\NetworkRepair.ps1 -Raw -Encoding UTF8
-          $pattern = '\$Script:AppVersion\s*=\s*''([^'']+)''' 
+          $pattern = '\$Script:AppVersion\s*=\s*''([^'']+)'''
           $match = [regex]::Match($content, $pattern)
           if (-not $match.Success) { throw 'Unable to determine application version.' }
           $version = $match.Groups[1].Value
@@ -33,7 +33,14 @@ jobs:
           if ($tagVersion -ne $version) {
             throw "Tag version $tagVersion does not match application version $version."
           }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Application version '$version' is not a supported release version."
+          }
+          $isPrerelease = $version -match '-'
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_IS_PRERELEASE=$($isPrerelease.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "Release version: $version"
+          Write-Host "Prerelease: $isPrerelease"
 
       - name: Install Pester
         run: Install-Module Pester -RequiredVersion 5.9.1 -Force -Scope CurrentUser -SkipPublisherCheck
@@ -62,6 +69,22 @@ jobs:
           $zip = Get-ChildItem .\release\*.zip | Select-Object -First 1
           $sha = Get-ChildItem .\release\*.sha256 | Select-Object -First 1
           if (-not $zip -or -not $sha) { throw 'Release artifacts not found.' }
-          gh release create "$env:GITHUB_REF_NAME" "$($zip.FullName)" "$($sha.FullName)" --title "NetworkRepair $env:GITHUB_REF_NAME" --generate-notes
+
+          $releaseArgs = @(
+            'release'
+            'create'
+            $env:GITHUB_REF_NAME
+            $zip.FullName
+            $sha.FullName
+            '--title'
+            "NetworkRepair $env:GITHUB_REF_NAME"
+            '--generate-notes'
+            '--verify-tag'
+          )
+          if ($env:RELEASE_IS_PRERELEASE -eq 'true') {
+            $releaseArgs += '--prerelease'
+          }
+
+          gh @releaseArgs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
