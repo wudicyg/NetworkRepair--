@@ -1,4 +1,4 @@
-# Architecture
+﻿# Architecture
 
 ```text
 BAT launcher
@@ -6,8 +6,10 @@ BAT launcher
 NetworkRepair.ps1
     ↓
 Diagnostics
+    ├─ Network Health Assessment
+    └─ Profile Hygiene Assessment
     ↓
-Risk rules
+Repair Decision
     ↓
 Repair Planner
     ├─ Safe Repair → eligible profile deletions
@@ -52,3 +54,14 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 - Registry Profile GUID ↔ NetworkId correlation
 
 The write boundary remains unchanged: only explicitly eligible non-active, non-managed candidates can enter Safe Repair.
+
+
+## Health vs. Profile hygiene
+
+NetworkRepair treats network connectivity health and Network List Profile hygiene as two independent dimensions.
+
+A machine can be **Healthy** while still containing historical numbered Profiles such as `网络 2`, `网络 3`, or `Network 4`. In that case the report says the network is healthy but recommends historical Profile cleanup, and the Repair Planner may still generate safe deletion actions for inactive, non-Managed candidates.
+
+Conversely, a healthy connection does not make an active or Managed numbered Profile eligible for deletion. Safety gates remain authoritative.
+
+When there is no historical Profile cleanup candidate and the network is healthy, the repair decision is explicitly `NoAction`; the tool does not enter a destructive repair path merely because it was invoked for testing.

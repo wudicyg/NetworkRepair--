@@ -125,6 +125,68 @@
         @($plan.Actions | Where-Object Action -eq 'ClearNewNetworks').Count | Should -Be 1
     }
 
+
+    It 'reports healthy network independently from historical profile hygiene' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='Internet';IPv6Connectivity='Internet'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $h.Status | Should -Be 'Healthy'
+
+        $candidate=[pscustomobject]@{KeyName='x';ProfileName='Network 7';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+        $diagnostics=[pscustomobject]@{
+            Candidates=@($candidate)
+            NetworkHealth=$h
+        }
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics
+        $decision.NetworkHealth.Status | Should -Be 'Healthy'
+        $decision.ProfileHygieneStatus | Should -Be 'HistoricalProfilesFound'
+        $decision.Recommendation | Should -Be 'CleanHistoricalProfiles'
+        $decision.Plan.DeleteProfileCount | Should -Be 1
+    }
+
+    It 'keeps cleaning historical numbered profiles on a healthy network' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='Internet';IPv6Connectivity='Internet'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $candidates=@(
+            [pscustomobject]@{KeyName='a';ProfileName='网络 2';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+            [pscustomobject]@{KeyName='b';ProfileName='网络 3';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+            [pscustomobject]@{KeyName='c';ProfileName='Network 4';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+        )
+        $diagnostics=[pscustomobject]@{Candidates=$candidates;NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics
+        $decision.NetworkHealth.OperationallyHealthy | Should -BeTrue
+        $decision.ProfileHygieneStatus | Should -Be 'HistoricalProfilesFound'
+        $decision.HistoricalProfileCount | Should -Be 3
+        $decision.Recommendation | Should -Be 'CleanHistoricalProfiles'
+        $decision.Plan.DeleteProfileCount | Should -Be 3
+        @($decision.Plan.Actions | Where-Object Action -eq 'DeleteProfile').Count | Should -Be 3
+    }
+
+    It 'reports healthy network with no cleanup need as no action' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='Internet';IPv6Connectivity='Internet'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $diagnostics=[pscustomobject]@{Candidates=@();NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics
+        $decision.NetworkHealth.Status | Should -Be 'Healthy'
+        $decision.ProfileHygieneStatus | Should -Be 'Clean'
+        $decision.Recommendation | Should -Be 'NoAction'
+        $decision.Plan.IsNoOp | Should -BeTrue
+    }
+
+    It 'does not classify a healthy numbered active profile as safe cleanup' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='Internet'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $candidate=[pscustomobject]@{KeyName='x';ProfileName='Network 8';RemediationAllowed=$false;IsActive=$true;RiskLevel='High';RiskScore=90;Reason='active'}
+        $diagnostics=[pscustomobject]@{Candidates=@($candidate);NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics
+        $decision.Recommendation | Should -Be 'NoAction'
+        $decision.ProfileHygieneStatus | Should -Be 'ProtectedNumberedProfilesPresent'
+        $decision.Plan.DeleteProfileCount | Should -Be 0
+    }
+
     It 'rejects invalid network names' {
         (Test-NRNetworkName -Name ('a' * 129)).Valid | Should -BeFalse
         (Test-NRNetworkName -Name 'bad/name').Valid | Should -BeFalse
