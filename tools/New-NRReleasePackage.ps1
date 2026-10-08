@@ -1,18 +1,18 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-    构建 NetworkRepair 正式发布包：单文件 exe + 完整源码包 + 校验值。
+    构建 NetMedic 正式发布包：单文件 exe + 完整源码包 + 校验值。
 
 .DESCRIPTION
     产出：
-      <输出目录>\NetworkRepair_<版本>_Windows\          发布包目录
-        ├─ 网络修复工具.exe                              单文件主程序（默认带提权清单）
-        ├─ 网络修复工具_<版本>.exe                       便携版副本，便于单独分发
+      <输出目录>\NetMedic_<版本>_Windows\          发布包目录
+        ├─ 网络医生.exe                              单文件主程序（默认带提权清单）
+        ├─ 网络医生_<版本>.exe                       便携版副本，便于单独分发
         ├─ 使用说明.md                                   面向普通用户的中文说明
-        ├─ 备用启动\启动-网络修复工具.bat                备用启动器
+        ├─ 备用启动\启动-网络医生.bat                备用启动器
         ├─ NetworkRepair.single.ps1                      压平后的单文件脚本
         └─ 源码与文档（NetworkRepair.ps1 / src / tools / docs / ...）
-      <输出目录>\NetworkRepair_<版本>_Windows.zip        发布包压缩文件（UTF-8 中文名）
+      <输出目录>\NetMedic_<版本>_Windows.zip        发布包压缩文件（UTF-8 中文名）
       <输出目录>\*.sha256                                对应的 SHA-256 校验文件
 
 .NOTES
@@ -22,7 +22,7 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'release'),
-    [string]$ExecutableName = '网络修复工具.exe',
+    [string]$ExecutableName = '网络医生.exe',
     [string]$PortableExecutableName = $null,
     [string]$Ps2ExeModulePath,
     [switch]$NoElevationManifest,
@@ -43,20 +43,20 @@ $content = Get-Content -LiteralPath $entry -Raw -Encoding UTF8
 $pattern = '\$Script:AppVersion\s*=\s*''([^'']+)'''
 $match = [regex]::Match($content, $pattern)
 if (-not $match.Success) {
-    throw 'Unable to determine NetworkRepair version from NetworkRepair.ps1.'
+    throw 'Unable to determine NetMedic version from NetworkRepair.ps1.'
 }
 $version = $match.Groups[1].Value
 if ([string]::IsNullOrWhiteSpace($version)) {
-    throw 'NetworkRepair version is empty.'
+    throw 'NetMedic version is empty.'
 }
 if ([string]::IsNullOrWhiteSpace($PortableExecutableName)) {
     # 发布页附件名必须是 ASCII：GitHub 会剥掉附件名里的非 ASCII 字符（实测上传
-    # 「网络修复工具_1.0.0.exe」会存成「_1.0.0.exe」）。中文名称改由发布流水线写入附件 label，
+    # 「网络医生_1.0.0.exe」会存成「_1.0.0.exe」）。中文名称改由发布流水线写入附件 label，
     # 包内的用户可见入口仍然是中文名。
-    $PortableExecutableName = ('NetworkRepair-{0}-Portable.exe' -f $version)
+    $PortableExecutableName = ('NetMedic-{0}-Portable.exe' -f $version)
 }
 
-$packageName = 'NetworkRepair_{0}_Windows' -f $version
+$packageName = 'NetMedic_{0}_Windows' -f $version
 $packageRoot = Join-Path $OutputDirectory $packageName
 $zipPath = Join-Path $OutputDirectory ($packageName + '.zip')
 $hashPath = Join-Path $OutputDirectory ($packageName + '.sha256')
@@ -134,7 +134,7 @@ $elevationText = 'requireAdministrator（双击后由 Windows 提示提权）'
 if ($NoElevationManifest) { $elevationText = '未嵌入（由脚本自行请求提权）' }
 $manifest = Join-Path $packageRoot 'RELEASE-MANIFEST.txt'
 @(
-    'NetworkRepair release package'
+    'NetMedic release package'
     ('Version: {0}' -f $version)
     ('GeneratedAt: {0}' -f (Get-Date).ToString('o'))
     ('Entry: {0}' -f $ExecutableName)
