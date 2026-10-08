@@ -110,7 +110,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本使用新的开发版本号，例如 `0.4.1-dev`。
+发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本从 `1.1.0-dev` 开始。
 
 Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。当前版本以 Windows 10 实机核心场景为主要行为证据，Windows 11 与更多环境组合属于后续扩展验证。
 ## 安全模型
