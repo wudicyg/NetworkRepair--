@@ -3,7 +3,6 @@
 ## v0.1.x — 稳定基础层
 - [x] 模块化 PowerShell 架构
 - [x] Safe Repair
-- [x] Dry Run
 - [x] 自动备份
 - [x] 验证与自动回滚
 - [x] JSON 报告
