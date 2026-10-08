@@ -1,6 +1,6 @@
 ﻿# 1.0.0 Release Validation
 
-NetworkRepair 的 CI 负责脚本语法、Pester 与发布包回归；1.0.0 的核心行为验收以 Windows 10 PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows Build 与语言环境作为后续扩展兼容性验证，不阻塞 1.0.0。
+NetMedic 的 CI 负责脚本语法、Pester 与发布包回归；1.0.0 的核心行为验收以 Windows 10 PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows Build 与语言环境作为后续扩展兼容性验证，不阻塞 1.0.0。
 
 ## 只读证据采集
 
@@ -32,7 +32,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation
 | 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
 | Deep Repair | 只验证 `NewNetworks` 范围，不触碰 Signatures 无差别清理 |
 | Rename | 显式 NetworkId 修改后名称与原意一致，失败可回滚 |
-| Restore | 只恢复 NetworkRepair 管理的 `Profiles` / `NewNetworks`；恢复后各 scoped 快照匹配；失败时仅回滚到 Restore 前安全备份 |
+| Restore | 只恢复 NetMedic 管理的 `Profiles` / `NewNetworks`；恢复后各 scoped 快照匹配；失败时仅回滚到 Restore 前安全备份 |
 | 中文/英文系统 | 当前以中文 Windows 10 的 `网络 N` 实机验证为主要证据；英文环境后续扩展验证 |
 
 ### Restore 证据要求
