@@ -84,3 +84,12 @@ A machine can be **Healthy** while still containing historical numbered Profiles
 Conversely, a healthy connection does not make an active or Managed numbered Profile eligible for deletion. Safety gates remain authoritative.
 
 When there is no historical Profile cleanup candidate and the network is healthy, the repair decision is explicitly `NoAction`; the tool does not enter a destructive repair path merely because it was invoked for testing.
+
+## Distribution packaging
+
+`tools/New-NRSingleFileDistribution.ps1` 把入口脚本与 `src/` 下全部模块按点源顺序压平成单个脚本：压平后的脚本在语义上与逐文件点源一致，但不再依赖 `src/` 目录，因此可以直接编译成单文件 exe。
+
+- **单文件 exe**：用 ps2exe 编译，默认嵌入 `requireAdministrator` 清单（构建后用字节搜索校验该标记确实存在）。exe 宿主中 `$MyInvocation.MyCommand` 没有 `Path` 属性，入口路径按「脚本路径 → `PSCommandPath` → 进程映像 → 应用程序域基目录」回退；提权逻辑再按宿主类型决定是重新运行入口脚本还是重启自身。
+- **备用启动器**：`备用启动\启动-网络修复工具.bat` 内容为纯 ASCII（批处理对中文内容与代码页敏感，中文只出现在文件名上），指向同一份压平脚本。
+- **发布包布局**：根目录只保留一个显眼入口 `网络修复工具.exe`，配套 `使用说明.md`；源码、文档与工具保持原有目录结构，供审计与二次开发。
+- **zip 编码**：使用 `ZipFile::CreateFromDirectory` 并显式传入 UTF-8 条目名，避免中文文件名解压后变成乱码；`Compress-Archive` 不保证这一点。
