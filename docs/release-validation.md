@@ -32,8 +32,20 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation
 | 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
 | Deep Repair | 只验证 `NewNetworks` 范围，不触碰 Signatures 无差别清理 |
 | Rename | 显式 NetworkId 修改后名称与原意一致，失败可回滚 |
-| Restore | 恢复后快照匹配；失败时回到恢复前安全备份 |
+| Restore | 只恢复 NetworkRepair 管理的 `Profiles` / `NewNetworks`；恢复后各 scoped 快照匹配；失败时仅回滚到 Restore 前安全备份 |
 | 中文/英文系统 | 分别验证 `网络 N` / `Network N` |
+
+### Restore 证据要求
+
+Restore 不应以完整 `NetworkList.reg` 导入成功作为验收标准。测试记录至少应包含：
+
+- Restore 前创建的安全备份目录。
+- `NetworkList-Profiles.reg` 和（存在时）`NetworkList-NewNetworks.reg`。
+- Restore 过程结果及退出状态。
+- Restore 后各 managed scope 的快照校验结果。
+- 如校验失败，自动回滚及回滚后的再次校验结果。
+
+完整 `NetworkList.reg` 作为基线快照保留，用于审计和故障排查，不作为默认 Restore 导入文件。
 
 ## 推荐测试顺序
 
@@ -112,7 +124,7 @@ ProtectedNumberedProfilesPresent
 - `machine.json`
 - Dry Run 输出
 - Safe Repair 前后诊断结果
-- 如执行 Restore/Rename，再保存对应日志与结果
+- 如执行 Restore/Rename，再保存对应日志、备份目录和 scoped 验证结果
 - Windows 版本、PowerShell、网卡介质、测试日期
 
 不要把 Wi-Fi 密码、VPN 凭据或其他秘密数据上传到 Issue。

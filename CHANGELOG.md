@@ -19,7 +19,7 @@
 - 开发版本 Tag（例如 `v0.4.0-dev`）由 Release 工作流自动标记为 Prerelease，并在创建 Release 前验证 Tag。
 - Release 发布流程补充文档，明确合并 `main` 不会自动创建 GitHub Release。
 - CI 增加 Release 工作流关键安全开关的静态回归检查。
-
+- 备份与发布验收文档现在明确区分完整 `NetworkList.reg` 基线快照与 Restore 实际导入的 `Profiles` / `NewNetworks` managed scopes。
 
 ### Fixed
 - Deep Repair 在网络健康且没有可安全清理 Profile 时不再生成破坏性 `NewNetworks` 刷新动作。
