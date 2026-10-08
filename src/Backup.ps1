@@ -1,11 +1,28 @@
 ﻿function New-NRBackup {
     $stamp=Get-Date -Format 'yyyyMMdd_HHmmss_fff';$dir=Join-Path $Script:Backups $stamp;New-Item -ItemType Directory -Path $dir -Force|Out-Null
-    $reg=Join-Path $dir 'NetworkList.reg';$diag=Join-Path $dir 'diagnostic.json';$meta=Join-Path $dir 'manifest.json'
-    Write-NRLog ('Creating backup: {0}'-f $dir);& reg.exe export 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList' $reg /y|Out-Null;$regExit=$LASTEXITCODE
+    $reg=Join-Path $dir 'NetworkList.reg'
+    $profilesReg=Join-Path $dir 'NetworkList-Profiles.reg'
+    $newNetworksReg=Join-Path $dir 'NetworkList-NewNetworks.reg'
+    $diag=Join-Path $dir 'diagnostic.json';$meta=Join-Path $dir 'manifest.json'
+    Write-NRLog ('Creating backup: {0}'-f $dir)
+    & reg.exe export 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList' $reg /y|Out-Null
+    $regExit=$LASTEXITCODE
     if($regExit -ne 0 -or -not(Test-Path -LiteralPath $reg)){Write-NRLog ('Registry export failed with exit code {0}.'-f $regExit) 'ERROR';Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue;throw ('注册表备份失败，reg.exe exit code={0}'-f $regExit)}
+    & reg.exe export 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles' $profilesReg /y|Out-Null
+    $profilesExit=$LASTEXITCODE
+    if($profilesExit -ne 0 -or -not(Test-Path -LiteralPath $profilesReg)){Write-NRLog ('Profiles registry export failed with exit code {0}.'-f $profilesExit) 'ERROR';Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue;throw ('Profiles 注册表备份失败，reg.exe exit code={0}'-f $profilesExit)}
+    $newNetworksPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\NewNetworks'
+    if(Test-Path -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\NewNetworks'){
+        & reg.exe export $newNetworksPath $newNetworksReg /y|Out-Null
+        $newNetworksExit=$LASTEXITCODE
+        if($newNetworksExit -ne 0 -or -not(Test-Path -LiteralPath $newNetworksReg)){Write-NRLog ('NewNetworks registry export failed with exit code {0}.'-f $newNetworksExit) 'ERROR';Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue;throw ('NewNetworks 注册表备份失败，reg.exe exit code={0}'-f $newNetworksExit)}
+    } else {
+        $newNetworksReg=$null
+        Write-NRLog 'NewNetworks registry key not present; scoped backup skipped.' 'WARN'
+    }
     $d=Get-NRDiagnostics -SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $diag -Encoding UTF8
-    [pscustomobject]@{App=$Script:AppName;Version=$Script:AppVersion;Timestamp=(Get-Date).ToString('o');RegistryBackup=$reg;DiagnosticSnapshot=$diag;ComputerName=$env:COMPUTERNAME}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $meta -Encoding UTF8
-    Write-NRLog ('Backup complete: {0}'-f $dir);[pscustomobject]@{Success=$true;Path=$dir;RegistryBackup=$reg;Manifest=$meta;Diagnostic=$diag}
+    [pscustomobject]@{App=$Script:AppName;Version=$Script:AppVersion;Timestamp=(Get-Date).ToString('o');RegistryBackup=$reg;ProfilesBackup=$profilesReg;NewNetworksBackup=$newNetworksReg;DiagnosticSnapshot=$diag;ComputerName=$env:COMPUTERNAME}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $meta -Encoding UTF8
+    Write-NRLog ('Backup complete: {0}'-f $dir);[pscustomobject]@{Success=$true;Path=$dir;RegistryBackup=$reg;ProfilesBackup=$profilesReg;NewNetworksBackup=$newNetworksReg;Manifest=$meta;Diagnostic=$diag}
 }
 
 function Resolve-NRBackupRegistryFile {
@@ -71,35 +88,72 @@ function Test-NRRegistrySnapshotMatch {
 
 function Invoke-NRRestoreSafetyRollback {
     param([Parameter(Mandatory)]$SafetyBackup)
+    $scopeMap=@(
+        [pscustomobject]@{Name='Profiles';RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'}
+        [pscustomobject]@{Name='NewNetworks';RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\NewNetworks'}
+    )
+    $results=@()
     try {
         Write-NRLog ('Restoring pre-restore safety backup: {0}'-f $SafetyBackup.Path) 'WARN'
-        & reg.exe import $SafetyBackup.RegistryBackup|Out-Null
-        $exitCode=$LASTEXITCODE
-        if($exitCode -ne 0){throw ('安全备份导入失败，reg.exe exit code={0}'-f $exitCode)}
+        foreach($scope in $scopeMap){
+            $file=if($scope.Name -eq 'Profiles'){$SafetyBackup.ProfilesBackup}else{$SafetyBackup.NewNetworksBackup}
+            if(-not $file -or -not(Test-Path -LiteralPath $file)){continue}
+            & reg.exe import $file|Out-Null
+            if($LASTEXITCODE -ne 0){throw ('安全备份导入失败，scope={0}，reg.exe exit code={1}'-f $scope.Name,$LASTEXITCODE)}
+        }
         Restart-NRNetworkServices
-        $verification=Test-NRRegistrySnapshotMatch -ExpectedRegistryFile $SafetyBackup.RegistryBackup
-        if(-not $verification.Success){throw ('安全备份回滚后的快照校验无法执行：{0}'-f $verification.Error)}
-        if(-not $verification.Match){throw '安全备份回滚后的注册表快照与安全备份不一致。'}
-        [pscustomobject]@{Success=$true;Verified=$true;Error=$null;Verification=$verification;SafetyBackup=$SafetyBackup.Path}
-    } catch {[pscustomobject]@{Success=$false;Verified=$false;Error=$_.Exception.Message;Verification=$null;SafetyBackup=$SafetyBackup.Path}}
+        foreach($scope in $scopeMap){
+            $file=if($scope.Name -eq 'Profiles'){$SafetyBackup.ProfilesBackup}else{$SafetyBackup.NewNetworksBackup}
+            if(-not $file -or -not(Test-Path -LiteralPath $file)){continue}
+            $verification=Test-NRRegistryScopeSnapshotMatch -ExpectedRegistryFile $file -RegistryPath $scope.RegistryPath
+            $results += [pscustomobject]@{Scope=$scope.Name;Verification=$verification}
+            if(-not $verification.Success -or -not $verification.Match){throw ('安全备份回滚后的 {0} 快照与安全备份不一致。'-f $scope.Name)}
+        }
+        [pscustomobject]@{Success=$true;Verified=$true;Error=$null;Verification=@($results);SafetyBackup=$SafetyBackup.Path}
+    } catch {
+        [pscustomobject]@{Success=$false;Verified=$false;Error=$_.Exception.Message;Verification=@($results);SafetyBackup=$SafetyBackup.Path}
+    }
 }
 
 function Restore-NRBackup {
     param([Parameter(Mandatory)][string]$BackupPath,[switch]$AssumeYes)
     $reg=Resolve-NRBackupRegistryFile -Path $BackupPath
-    if(!(Confirm-NRAction -Message ('即将导入备份 {0}，这会覆盖当前 NetworkList 配置。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
-    $preRestore=New-NRBackup;Write-NRLog ('Restore safety backup created: {0}'-f $preRestore.Path)
-    & reg.exe import $reg|Out-Null
-    if($LASTEXITCODE -ne 0){$rollback=Invoke-NRRestoreSafetyRollback -SafetyBackup $preRestore;return [pscustomobject]@{Success=$false;Cancelled=$false;Path=$reg;Error='reg.exe import failed';Rollback=$rollback;SafetyBackup=$preRestore.Path}}
-    Restart-NRNetworkServices
-    $snapshotVerification=Test-NRRegistrySnapshotMatch -ExpectedRegistryFile $reg
-    if(-not $snapshotVerification.Success -or -not $snapshotVerification.Match){
-        $reason=if(-not $snapshotVerification.Success){$snapshotVerification.Error}else{'恢复后的 NetworkList 快照与所选备份不一致。'}
-        Write-NRLog ('Restore snapshot verification failed: {0}'-f $reason) 'ERROR'
-        $rollback=Invoke-NRRestoreSafetyRollback -SafetyBackup $preRestore
-        return [pscustomobject]@{Success=$false;Cancelled=$false;Path=$reg;Error=$reason;SnapshotVerification=$snapshotVerification;Rollback=$rollback;SafetyBackup=$preRestore.Path}
+    $profilesReg=Resolve-NRScopedBackupFile -BackupPath $reg -ScopeName 'Profiles'
+    $newNetworksReg=Resolve-NRScopedBackupFile -BackupPath $reg -ScopeName 'NewNetworks'
+    if(-not $profilesReg){
+        throw '该备份由旧版本生成，缺少 NetworkList-Profiles.reg。请先用当前版本重新创建备份后再执行 Restore。'
     }
-    $validation=Get-NRDiagnostics -SkipConnectivityTest
-    Write-NRLog 'Restore completed, snapshot verified, and state re-read.'
-    [pscustomobject]@{Success=$true;Path=$reg;SafetyBackup=$preRestore.Path;SnapshotVerification=$snapshotVerification;Validation=$validation}
+    if(!(Confirm-NRAction -Message ('即将恢复 NetworkRepair 管理的 Profiles/NewNetworks 范围，原始完整备份仍保留。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
+
+    $preRestore=New-NRBackup
+    try {
+        Write-NRLog ('Restore safety backup created: {0}'-f $preRestore.Path)
+        & reg.exe import $profilesReg|Out-Null
+        if($LASTEXITCODE -ne 0){throw ('Profiles restore failed, reg.exe exit code={0}'-f $LASTEXITCODE)}
+        if($newNetworksReg){
+            & reg.exe import $newNetworksReg|Out-Null
+            if($LASTEXITCODE -ne 0){throw ('NewNetworks restore failed, reg.exe exit code={0}'-f $LASTEXITCODE)}
+        }
+        Restart-NRNetworkServices
+        $scopeMap=@(
+            [pscustomobject]@{Name='Profiles';File=$profilesReg;RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'}
+            [pscustomobject]@{Name='NewNetworks';File=$newNetworksReg;RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\NewNetworks'}
+        )
+        $verificationResults=@()
+        foreach($scope in $scopeMap){
+            if(-not $scope.File){continue}
+            $verification=Test-NRRegistryScopeSnapshotMatch -ExpectedRegistryFile $scope.File -RegistryPath $scope.RegistryPath
+            $verificationResults += [pscustomobject]@{Scope=$scope.Name;Verification=$verification}
+            if(-not $verification.Success -or -not $verification.Match){throw ('恢复后的 {0} 快照与所选备份不一致。'-f $scope.Name)}
+        }
+        $validation=Get-NRDiagnostics -SkipConnectivityTest
+        Write-NRLog 'Restore completed, scoped snapshots verified, and state re-read.'
+        return [pscustomobject]@{Success=$true;Path=$reg;SafetyBackup=$preRestore.Path;ScopeVerification=@($verificationResults);Validation=$validation}
+    } catch {
+        $errorMessage=$_.Exception.Message
+        Write-NRLog ('Restore failed: {0}'-f $errorMessage) 'ERROR'
+        $rollback=Invoke-NRRestoreSafetyRollback -SafetyBackup $preRestore
+        return [pscustomobject]@{Success=$false;Cancelled=$false;Path=$reg;Error=$errorMessage;Rollback=$rollback;SafetyBackup=$preRestore.Path}
+    }
 }
+
