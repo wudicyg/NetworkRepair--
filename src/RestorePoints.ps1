@@ -9,9 +9,7 @@ function Write-NRRestorePointLog {
         [Parameter(Mandatory)][string]$Message,
         [ValidateSet('INFO','WARN','ERROR')][string]$Level = 'WARN'
     )
-    $logFile = [string](Get-Variable -Name 'LogFile' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
-    if ([string]::IsNullOrWhiteSpace($logFile)) { return }
-    Write-NRLog -Message $Message -Level $Level
+    Write-NRSafeLog -Message $Message -Level $Level
 }
 
 function Get-NRRestorePointLevelName {
