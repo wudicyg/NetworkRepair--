@@ -4,6 +4,7 @@
         . (Join-Path $root 'src\Common.ps1')
         . (Join-Path $root 'src\NetworkListManager.ps1')
         . (Join-Path $root 'src\NetworkIdentity.ps1')
+        . (Join-Path $root 'src\RepairPlan.ps1')
         . (Join-Path $root 'src\Ncsi.ps1')
         . (Join-Path $root 'src\Diagnostics.ps1')
         . (Join-Path $root 'src\Backup.ps1')
@@ -102,6 +103,26 @@
             $r.Match | Should -BeFalse
             $r.Differences.Count | Should -BeGreaterThan 0
         } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+
+    It 'builds a delete plan only from remediation-allowed candidates' {
+        $safe=[pscustomobject]@{KeyName='safe';ProfileName='Network 2';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive';}
+        $blocked=[pscustomobject]@{KeyName='blocked';ProfileName='Network 3';RemediationAllowed=$false;RiskLevel='High';RiskScore=90;Reason='active';}
+        $plan=Get-NRRepairPlan -Candidates @($safe,$blocked)
+        $plan.DeleteProfileCount | Should -Be 1
+        $plan.IsNoOp | Should -BeFalse
+        @($plan.Actions | Where-Object Action -eq 'DeleteProfile').Count | Should -Be 1
+        $plan.SkippedCandidates.Count | Should -Be 1
+    }
+
+    It 'creates a Deep Repair refresh action even without deletable profiles' {
+        $blocked=[pscustomobject]@{KeyName='blocked';ProfileName='Network 3';RemediationAllowed=$false;RiskLevel='High';RiskScore=90;Reason='active';}
+        $plan=Get-NRRepairPlan -Candidates @($blocked) -Deep
+        $plan.DeleteProfileCount | Should -Be 0
+        $plan.ClearNewNetworksRequested | Should -BeTrue
+        $plan.IsNoOp | Should -BeFalse
+        @($plan.Actions | Where-Object Action -eq 'ClearNewNetworks').Count | Should -Be 1
     }
 
     It 'rejects invalid network names' {
