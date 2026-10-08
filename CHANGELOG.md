@@ -11,7 +11,7 @@
 - 健康网络且无安全清理候选时明确返回 NoAction，不进入修改路径。
 
 ## [0.4.0-dev]\n\n### Added\n- 独立修复决策计划层，统一 Dry Run 与真实修复路径。\n- Deep Repair 在无可删除 Profile 时仍可明确执行 `NewNetworks` 刷新。\n- Restore 完成注册表快照校验；校验失败时自动回到恢复前安全备份并再次验证。\n- 增加修复计划与注册表快照比较回归测试。\n- 网络健康状态与 Profile 历史遗留独立判断；健康网络仍可生成历史 Profile 清理计划。\n- 健康网络且无安全清理候选时明确返回 NoAction，不进入修改路径。\n\n### Fixed\n- 扫描兼容缺失 `LastWriteTime` 的 Registry Provider 对象。\n- NLM COM 不可用时降级为 PowerShell / 注册表诊断，不阻断 Scan。\n- 兼容缺失 `IPv4Address` 属性的网络接口对象。\n- 隔离可选诊断阶段，避免单项网络组件异常中止整次扫描。\n- Safe Repair 显示备份、删除、服务处理、验证与自动回滚进度，并输出最终结果。\n
-## [0.3.0-dev]
+- 增加一键脱敏诊断包导出器，仅保留发布验收和故障排查所需的非敏感摘要。\n- 脱敏包明确排除计算机名、MAC、IP、RegistryPath、NetworkId、URL 与凭据。\n\n## [0.3.0-dev]
 
 ### Added
 - Registry Profile GUID 与 Network List Manager NetworkId 精确关联。
