@@ -4,7 +4,7 @@
 
 > 当前稳定版本：**0.2.0**
 
-当前主分支：**0.3.0-dev（已合并 v0.3 Network Identity / Rename 能力，待实机验证）**
+当前主分支：**0.4.0-dev（已合并 Repair Planner 与 Restore 快照校验能力，待实机验证）**
 
 NetworkRepair 的目标不是“暴力清理注册表”，而是：
 
@@ -30,6 +30,9 @@ NetworkRepair 的目标不是“暴力清理注册表”，而是：
 - NCSI DNS / HTTP 探测
 - Profile GUID ↔ NetworkId 精确关联
 - 基于 Network List Manager 的显式网络重命名
+- 独立 Repair Planner：统一 Dry Run 与真实修复的操作计划
+- Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
+- Restore 导入后进行 `NetworkList.reg` 快照校验，失败自动回到恢复前安全备份
 
 ## 快速开始
 
@@ -116,6 +119,7 @@ NetworkRepair/
 │  ├─ Diagnostics.ps1
 │  ├─ NetworkListManager.ps1
 │  ├─ NetworkIdentity.ps1
+│  ├─ RepairPlan.ps1
 │  ├─ Ncsi.ps1
 │  ├─ Backup.ps1
 │  ├─ Repair.ps1
@@ -148,7 +152,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-当前 `main` 已包含 v0.3 的 Network Identity / 安全重命名能力，但正式稳定版仍需完成 Windows 10 / 11 实机矩阵、更多语言环境和发布包验证。后续重点是恢复点增强、诊断包导出与用户体验。
+当前 `main` 已包含 v0.4 的 Repair Planner 与 Restore 快照校验闭环，但正式稳定版仍需完成 Windows 10 / 11 实机矩阵、更多语言环境和发布包验证。后续重点是 TUI 增强、脱敏诊断包和多级恢复点。
 
 ## License
 
