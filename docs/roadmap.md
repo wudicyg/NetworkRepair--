@@ -38,5 +38,5 @@
 ## v1.0.x — 稳定发布
 - [ ] Windows 10 / 11 多版本验证
 - [ ] 回归测试矩阵
-- [ ] Release 打包
+- [x] Release 打包自动化
 - [ ] GitHub Issues / Discussions 工作流
