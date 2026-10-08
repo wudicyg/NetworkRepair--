@@ -40,7 +40,7 @@
 - [ ] Windows 11 / 更多环境扩展验证
 - [ ] 回归测试矩阵
 - [x] Release 打包自动化
-- [ ] GitHub Issues / Discussions 工作流
+- [x] GitHub Issues / Discussions 工作流
 
 ## 1.1.x — 后续开发
 - [ ] GUI 前端
