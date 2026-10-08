@@ -144,6 +144,25 @@
         $decision.Plan.DeleteProfileCount | Should -Be 1
     }
 
+    It 'keeps cleaning historical numbered profiles on a healthy network' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='Internet';IPv6Connectivity='Internet'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $candidates=@(
+            [pscustomobject]@{KeyName='a';ProfileName='网络 2';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+            [pscustomobject]@{KeyName='b';ProfileName='网络 3';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+            [pscustomobject]@{KeyName='c';ProfileName='Network 4';RemediationAllowed=$true;RiskLevel='Low';RiskScore=30;Reason='inactive'}
+        )
+        $diagnostics=[pscustomobject]@{Candidates=$candidates;NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics
+        $decision.NetworkHealth.OperationallyHealthy | Should -BeTrue
+        $decision.ProfileHygieneStatus | Should -Be 'HistoricalProfilesFound'
+        $decision.HistoricalProfileCount | Should -Be 3
+        $decision.Recommendation | Should -Be 'CleanHistoricalProfiles'
+        $decision.Plan.DeleteProfileCount | Should -Be 3
+        @($decision.Plan.Actions | Where-Object Action -eq 'DeleteProfile').Count | Should -Be 3
+    }
+
     It 'reports healthy network with no cleanup need as no action' {
         $connections=@([pscustomobject]@{IPv4Connectivity='Internet';IPv6Connectivity='Internet'})
         $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
