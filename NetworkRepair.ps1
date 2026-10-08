@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','RestorePoints','Prune','Report','Rename','Gui','GuiSmoke','Version')]
+    [ValidateSet('Menu','Scan','Repair','DeepRepair','Backup','Restore','RestorePoints','Prune','Report','Rename','Gui','GuiSmoke','CheckUpdate','Version')]
     [string]$Mode = 'Menu',
     [string]$BackupPath,
     [int]$RestorePointIndex = 0,
@@ -50,6 +50,7 @@ $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'Services.ps1')
 . (Join-Path $Script:Src 'Repair.ps1')
 . (Join-Path $Script:Src 'Validation.ps1')
+. (Join-Path $Script:Src 'Update.ps1')
 . (Join-Path $Script:Src 'Gui.ps1')
 Initialize-NRPaths
 $Script:LogFile = New-NRLogFile
@@ -165,6 +166,13 @@ try {
         $smoke = Invoke-NRGuiSmokeTest
         if ($Json) { $smoke | ConvertTo-Json -Depth 5 } else { Write-Output (('GUI smoke: Success={0}, Controls={1}, Error={2}' -f $smoke.Success, $smoke.ControlCount, $smoke.Error)) }
         if (-not $smoke.Success) { exit 3 }
+        exit 0
+    }
+    if ($Mode -eq 'CheckUpdate') {
+        # 只读的网络检查：不需要管理员权限，也不接触本机任何配置。
+        $update = Get-NRLatestRelease
+        if ($Json) { $update | ConvertTo-Json -Depth 6 } else { Write-NRLine (Get-NRUpdateCheckMessage -Result $update) $(if ($update.IsNewer) { 'Yellow' } else { 'Green' }) }
+        if (-not $update.Success) { exit 9 }
         exit 0
     }
     $relaunch = New-Object System.Collections.Generic.List[string]

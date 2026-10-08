@@ -10,7 +10,19 @@
         . (Join-Path $root 'src\Backup.ps1')
         . (Join-Path $root 'src\RestorePoints.ps1')
         . (Join-Path $root 'src\Services.ps1')
+        . (Join-Path $root 'src\Update.ps1')
         . (Join-Path $root 'src\Gui.ps1')
+
+        function New-TestReleaseFeed {
+            param([Parameter(Mandatory)][string[]]$Tags)
+            $entries = foreach ($tag in $Tags) {
+                '<entry><title>NetworkRepair {0}</title><link rel="alternate" type="text/html" href="https://github.com/wudicyg/NetworkRepair--/releases/tag/{0}"/><updated>2026-01-01T00:00:00Z</updated></entry>' -f $tag
+            }
+            [pscustomobject]@{
+                StatusCode = 200
+                Content    = ('<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">{0}</feed>' -f ($entries -join ''))
+            }
+        }
 
         function New-TestRestorePoint {
             param(
@@ -1029,5 +1041,118 @@
         # 发布包要带上 assets，脚本方式运行时才能取到窗口图标。
         $packager = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRReleasePackage.ps1') -Raw -Encoding UTF8
         $packager | Should -Match ([regex]::Escape("'assets'"))
+    }
+
+    It 'compares versions the way the update check needs' {
+        (Compare-NRVersion -Left '1.2.0' -Right '1.3.0') | Should -Be (-1)
+        (Compare-NRVersion -Left '1.3.0' -Right '1.2.0') | Should -Be 1
+        (Compare-NRVersion -Left '1.2.0' -Right '1.2.0') | Should -Be 0
+        (Compare-NRVersion -Left 'v1.2.0' -Right '1.2.0') | Should -Be 0
+        # 逐位数字比较，不能按字符串比（否则 1.10.0 会被判成比 1.2.0 旧）
+        (Compare-NRVersion -Left '1.2.0' -Right '1.10.0') | Should -Be (-1)
+        (Compare-NRVersion -Left '2.0.0' -Right '1.99.99') | Should -Be 1
+
+        # 语义化版本：数字相同时，带预发布后缀的更旧
+        (Compare-NRVersion -Left '1.3.0-beta.1' -Right '1.3.0') | Should -Be (-1)
+        (Compare-NRVersion -Left '1.3.0' -Right '1.3.0-beta.1') | Should -Be 1
+        (Compare-NRVersion -Left '1.3.0-alpha' -Right '1.3.0-beta') | Should -Be (-1)
+
+        # 无法解析时返回空值而不是抛异常
+        (Compare-NRVersion -Left 'not-a-version' -Right '1.0.0') | Should -BeNullOrEmpty
+        (Compare-NRVersion -Left '1.0.0' -Right 'nightly') | Should -BeNullOrEmpty
+        (ConvertTo-NRVersionParts -Version '') | Should -BeNullOrEmpty
+        (ConvertTo-NRVersionParts -Version 'v1.2.3').Patch | Should -Be 3
+        (ConvertTo-NRVersionParts -Version '1.2.3-rc.2').PreRelease | Should -Be 'rc.2'
+        (ConvertTo-NRVersionParts -Version '1.2.3').PreRelease | Should -BeNullOrEmpty
+    }
+
+    It 'reads the newest release from the atom feed without any token' {
+        Mock -CommandName Invoke-WebRequest -MockWith { New-TestReleaseFeed -Tags @('v9.9.9', 'v1.2.0') }
+        $result = Get-NRLatestRelease -CurrentVersion '1.2.0'
+        $result.Success | Should -BeTrue
+        $result.Source | Should -Be 'atom'
+        $result.TagName | Should -Be 'v9.9.9'
+        $result.Version | Should -Be '9.9.9'
+        $result.IsNewer | Should -BeTrue
+        $result.Comparison | Should -Be (-1)
+        $result.Url | Should -Match 'releases/tag/v9\.9\.9'
+        (Get-NRUpdateCheckMessage -Result $result) | Should -Match '发现新版本 9.9.9'
+    }
+
+    It 'skips pre releases unless they are explicitly requested' {
+        Mock -CommandName Invoke-WebRequest -MockWith { New-TestReleaseFeed -Tags @('v2.0.0-beta.1', 'v1.9.0') }
+
+        # 默认只认正式版：最新的正式版是 1.9.0，而不是排在前面的 2.0.0-beta.1
+        $stable = Get-NRLatestRelease -CurrentVersion '1.2.0'
+        $stable.Success | Should -BeTrue
+        $stable.Version | Should -Be '1.9.0'
+
+        $any = Get-NRLatestRelease -CurrentVersion '1.2.0' -IncludePrerelease
+        $any.Version | Should -Be '2.0.0-beta.1'
+    }
+
+    It 'falls back to the REST API when the atom feed is unavailable' {
+        Mock -CommandName Invoke-WebRequest -MockWith { throw 'atom feed unavailable' }
+        Mock -CommandName Invoke-RestMethod -MockWith {
+            [pscustomobject]@{
+                tag_name     = 'v9.9.9'
+                name         = 'NetworkRepair v9.9.9'
+                html_url     = 'https://example.invalid/releases/tag/v9.9.9'
+                published_at = '2026-01-01T00:00:00Z'
+                prerelease   = $false
+                assets       = @([pscustomobject]@{ name = 'NetworkRepair-9.9.9-Portable.exe' })
+            }
+        }
+        $result = Get-NRLatestRelease -CurrentVersion '1.2.0'
+        $result.Success | Should -BeTrue
+        $result.Source | Should -Be 'api'
+        $result.Version | Should -Be '9.9.9'
+        $result.IsNewer | Should -BeTrue
+        @($result.Assets).Count | Should -Be 1
+    }
+
+    It 'treats a failed update check as a non fatal result' {
+        Mock -CommandName Invoke-WebRequest -MockWith { throw 'Name resolution failed' }
+        Mock -CommandName Invoke-RestMethod -MockWith { throw 'API rate limit exceeded' }
+        $result = Get-NRLatestRelease -CurrentVersion '1.2.0'
+        $result.Success | Should -BeFalse
+        $result.IsNewer | Should -BeFalse
+        $result.Error | Should -Match 'Name resolution failed'
+        $result.Error | Should -Match 'API rate limit exceeded'
+        (Get-NRUpdateCheckMessage -Result $result) | Should -Match '无法检查更新'
+    }
+
+    It 'wires the update check into the command line and the window' {
+        Mock -CommandName Invoke-WebRequest -MockWith { New-TestReleaseFeed -Tags @('v1.2.0') }
+        $result = Get-NRLatestRelease -CurrentVersion '1.2.0'
+        $result.Success | Should -BeTrue
+        $result.IsNewer | Should -BeFalse
+        (Get-NRUpdateCheckMessage -Result $result) | Should -Match '已是最新版本 1.2.0'
+
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match ([regex]::Escape("'CheckUpdate'"))
+        $entry | Should -Match ([regex]::Escape('Update.ps1'))
+        # 只读的网络检查必须放在提权之前，否则普通用户没有管理员权限就用不了
+        $checkIndex = $entry.IndexOf("if (`$Mode -eq 'CheckUpdate')")
+        $adminIndex = $entry.IndexOf('Assert-NRAdministrator')
+        $checkIndex | Should -BeGreaterThan 0
+        $checkIndex | Should -BeLessThan $adminIndex
+
+        $gui = Get-Content -LiteralPath (Join-Path $root 'src\Gui.ps1') -Raw -Encoding UTF8
+        $gui | Should -Match 'btnCheckUpdate'
+        $gui | Should -Match 'Invoke-NRGuiUpdateCheck'
+        # 只检查、只跳转：界面里不允许出现自动下载
+        $gui | Should -Not -Match 'Invoke-WebRequest'
+        $gui | Should -Not -Match 'DownloadFile'
+
+        $update = Get-Content -LiteralPath (Join-Path $root 'src\Update.ps1') -Raw -Encoding UTF8
+        # 首选 atom 源（无速率限制），API 只作后备：匿名调用 api.github.com 会被速率限制挡掉
+        $update | Should -Match 'releases\.atom'
+        $update | Should -Match 'releases/latest'
+        # Windows PowerShell 5.1 的默认安全协议可能不含 TLS 1.2，而 GitHub 只接受 TLS 1.2+。
+        # 实测缺这个开关时请求直接失败；mock 测不出来，所以做源码级断言。
+        $update | Should -Match 'Tls12'
+        # SystemDefault 不能被改写成「仅 TLS 1.2」，否则现代系统上反而更容易失败
+        $update | Should -Match 'SystemDefault'
     }
 }

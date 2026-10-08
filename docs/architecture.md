@@ -76,6 +76,16 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 - **必须同时加 `-noOutput`**：ps2exe 在无控制台模式下会把脚本输出（`Write-Output` 与 `Write-Host` 都算）收集起来，用一个模态对话框显示，进程会一直等到用户点「确定」。实测不加该开关时，打包后的 exe 一有输出就弹窗并卡住；CI 因此用「带超时的等待 + 退出码」而不是无限等待来验证图形版启动。
 - **应用图标**：`assets/NetworkRepair.ico` 由 `tools/New-NRIcon.ps1` 生成（可重复生成，仓库里不存手改的二进制）。exe 编译时通过 `-iconFile` 嵌入；窗口图标在打包运行时用 `Icon::ExtractAssociatedIcon` 取自自身进程映像，脚本方式运行时回退到包内 `assets\NetworkRepair.ico`。小尺寸用传统 DIB 条目、大尺寸用 PNG 条目压缩，兼顾兼容性与体积。
 
+## Update check
+
+`src/Update.ps1` 查询 GitHub 发布页的最新版本并与当前版本比较，不涉及本机任何配置。
+
+- **只检查、只告知**：不自动下载、不自动替换自身。自替换需要提权、代码签名与失败回滚，属于新的风险面，与项目「先诊断、先备份、可回滚」的姿态不符；是否升级由用户自己决定。
+- **可测的纯函数**：版本解析（`ConvertTo-NRVersionParts`）与比较（`Compare-NRVersion`）不碰网络。按主/次/修订号逐位数字比较（不是字符串比较，否则 `1.10.0` 会被判成比 `1.2.0` 旧），数字相同时带预发布后缀的一侧更旧；无法解析时返回空值而不是抛异常。
+- **失败不致命**：`Get-NRLatestRelease` 把网络异常收敛成 `Success=$false` + `Error`，绝不向上抛。检查失败只记一条 WARN 日志。
+- **不阻塞用户**：命令行 `-Mode CheckUpdate` 放在提权检查之前（只读检查不需要管理员权限），失败退出码 9、成功 0；界面里的启动检查只在诊断结果网络健康时进行，网络不通就跳过，因为本工具常被用来修网络。
+- **隐私**：只读取 GitHub 公开的发布元数据，不上报任何本机数据。
+
 ## Diagnostic layers
 
 - Connection Profile
