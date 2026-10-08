@@ -26,7 +26,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation
 | 正常 Internet，存在非活动 `网络 2/3/4` 或 `Network 2/3/4` | `NetworkHealth=Healthy`，仍识别为历史 Profile，并生成清理计划 |
 | 正常 Internet，但编号 Profile 为当前活动连接 | 不允许自动删除 |
 | 正常 Internet，但编号 Profile 为 Managed | 不允许自动删除 |
-| Windows 10 + PowerShell 5.1 | 读取、Dry Run、Safe Repair 回归通过 |
+| Windows 10 + PowerShell 5.1 | 读取与 Safe Repair 回归通过 |
 | Windows 11 + PowerShell 5.1 | 后续扩展验证，不阻塞 0.4.0 |
 | DHCP IPv4 | 修复前后 IPv4、默认网关、DNS 正常 |
 | 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
@@ -85,13 +85,13 @@ Network 4
 
 并确保这些 Profile 不是当前活动连接、不是 Managed。
 
-先执行：
+执行：
 
 ```powershell
-.\NetworkRepair.bat -Mode DryRun
+.\NetworkRepair.bat -Mode Repair
 ```
 
-期望：
+在确认提示前检查显示的修复计划，应为：
 
 ```text
 NetworkHealth = Healthy
@@ -99,15 +99,13 @@ ProfileHygieneStatus = HistoricalProfilesFound
 RepairRecommendation = CleanHistoricalProfiles
 ```
 
-并看到 3 个 `DeleteProfile` 动作。
-
-确认计划正确后，再执行 Safe Repair。
+并看到 3 个 `DeleteProfile` 动作；确认后再执行实际修复。
 
 ### 4. 保护性回归
 
 将其中一个编号 Profile 设为当前活动连接，或让它成为 Managed Profile。
 
-重复 Dry Run。
+再次执行 Repair，在确认前检查保护结果。
 
 期望该对象进入：
 
@@ -122,7 +120,6 @@ ProtectedNumberedProfilesPresent
 每台机器至少保留：
 
 - `machine.json`
-- Dry Run 输出
 - Safe Repair 前后诊断结果
 - 如执行 Restore/Rename，再保存对应日志、备份目录和 scoped 验证结果
 - Windows 版本、PowerShell、网卡介质、测试日期
