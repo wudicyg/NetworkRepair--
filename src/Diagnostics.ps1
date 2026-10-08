@@ -12,37 +12,6 @@ function Test-NRInternetConnectivity {
     try { $tcpOk=[bool](Test-NetConnection -ComputerName 'dns.msftncsi.com' -Port 443 -InformationLevel Quiet -WarningAction SilentlyContinue) } catch {}
     [pscustomobject]@{Skipped=$false;DNS=$dnsOk;TCP443=$tcpOk}
 }
-function Get-NRSuspiciousProfiles {
-    param([Parameter(Mandatory)][object[]]$RegistryProfiles,[string[]]$ActiveNames = @())
-    $activeSet=@{};foreach($n in $ActiveNames){if($n){$activeSet[$n.ToLowerInvariant()]=$true}}
-    foreach($p in $RegistryProfiles){
-        if([string]::IsNullOrWhiteSpace($p.ProfileName)){continue}
-        $name=$p.ProfileName.Trim();$numbered=$name -match '^(网络|Network)\s+\d+$';$isActive=$activeSet.ContainsKey($name.ToLowerInvariant());$risk='None';$reason='正常或未命中安全清理规则'
-        if($p.Managed -eq 1 -or $p.Managed -eq $true){$risk='High';$reason='网络配置标记为 Managed；不自动修改'}
-        elseif($numbered -and $isActive){$risk='High';$reason='名称符合重复网络模式，但当前仍为活动连接；禁止自动删除'}
-        elseif($numbered -and -not $isActive){$risk='Low';$reason='疑似历史/重复网络名称，且不是当前活动连接'}
-        [pscustomobject]@{KeyName=$p.KeyName;ProfileName=$p.ProfileName;Category=$p.Category;Managed=$p.Managed;IsActive=$isActive;Risk=$risk;Reason=$reason;RegistryPath=$p.RegistryPath;LastWrite=$p.LastWrite}
-    }
-}
-function Get-NRLegacyDiagnostics {
-    param([switch]$SkipConnectivityTest)
-    $windows=Get-NRWindowsInfo;$adapters=Get-NRAdapters;$connections=Get-NRConnectionProfiles;$registryProfiles=Get-NRProfileRegistryObjects;$activeNames=Get-NRActiveProfileNames
-    $suspects=@(Get-NRSuspiciousProfiles -RegistryProfiles $registryProfiles -ActiveNames $activeNames);$connectivity=Test-NRInternetConnectivity -Skip:$SkipConnectivityTest
-    $issues=New-Object System.Collections.Generic.List[string];$safe=@($suspects|Where-Object Risk -eq 'Low');$high=@($suspects|Where-Object Risk -eq 'High')
-    if($safe.Count){[void]$issues.Add(('发现 {0} 个疑似历史/重复网络 Profile。'-f $safe.Count))}
-    if($high.Count){[void]$issues.Add(('发现 {0} 个高风险或当前活动 Profile，默认不会删除。'-f $high.Count))}
-    if(-not $SkipConnectivityTest -and -not $connectivity.DNS){[void]$issues.Add('DNS 解析测试失败。')}
-    if(-not $SkipConnectivityTest -and -not $connectivity.TCP443){[void]$issues.Add('TCP/443 Internet 连通性测试失败。')}
-    [pscustomobject]@{Timestamp=(Get-Date).ToString('o');Windows=$windows;Adapters=@($adapters);Connections=@($connections);ActiveProfileNames=@($activeNames);RegistryProfiles=@($registryProfiles);Candidates=@($suspects);Connectivity=$connectivity;Issues=@($issues);SafeCandidateCount=$safe.Count;HighRiskCount=$high.Count}
-}
-function Show-NRDiagnostics {
-    param([Parameter(Mandatory)]$Diagnostics)
-    Show-NRBanner;Write-NRSection '系统';Write-NRLine ('Windows: {0} {1} (Build {2})'-f $Diagnostics.Windows.Caption,$Diagnostics.Windows.Version,$Diagnostics.Windows.Build);Write-NRLine ('PowerShell: {0}'-f $Diagnostics.Windows.PowerShell)
-    Write-NRSection '当前连接';if(!$Diagnostics.Connections.Count){Write-NRLine '没有读取到活动连接 Profile。' 'Yellow'}else{foreach($c in $Diagnostics.Connections){Write-NRLine ('{0} | 网卡={1} | 类型={2} | IPv4={3} | IPv6={4}'-f $c.Name,$c.InterfaceAlias,$c.NetworkCategory,$c.IPv4Connectivity,$c.IPv6Connectivity)}}
-    Write-NRSection '可疑 Profile';if(!$Diagnostics.Candidates.Count){Write-NRLine '没有命中当前的安全清理规则。' 'Green'}else{foreach($p in $Diagnostics.Candidates){$color=if($p.Risk -eq 'Low'){'Yellow'}else{'Red'};Write-NRLine ('[{0}] {1} | Active={2} | Reason={3}'-f $p.Risk,$p.ProfileName,$p.IsActive,$p.Reason) $color}}
-    Write-NRSection '连通性';if($Diagnostics.Connectivity.Skipped){Write-NRLine '已跳过 Internet/DNS 测试。' 'Yellow'}else{Write-NRLine ('DNS={0} | TCP443={1}'-f $Diagnostics.Connectivity.DNS,$Diagnostics.Connectivity.TCP443) $(if($Diagnostics.Connectivity.DNS -and $Diagnostics.Connectivity.TCP443){'Green'}else{'Yellow'})}
-    Write-NRSection '结论';if(!$Diagnostics.Issues.Count){Write-NRLine '当前没有发现明显问题。' 'Green'}else{foreach($i in $Diagnostics.Issues){Write-NRLine ('- '+$i) 'Yellow'}}
-}
 function Invoke-NRScan { param([switch]$SkipConnectivityTest);Write-NRLog 'Starting diagnostic scan.';$d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;if(-not $Json){Show-NRDiagnostics -Diagnostics $d};Write-NRLog ('Diagnostic scan complete. SafeCandidates={0}, HighRisk={1}'-f $d.SafeCandidateCount,$d.HighRiskCount);$d }
 function Export-NRReport {
     param([string]$Path,[switch]$SkipConnectivityTest)
@@ -110,11 +79,14 @@ function Test-NRDnsServers {
 function Get-NRSuspiciousProfiles {
     param(
         [Parameter(Mandatory)][object[]]$RegistryProfiles,
-        [Parameter(Mandatory)][string[]]$ActiveNames,
-        [string[]]$NlmActiveNames = @()
+        [string[]]$ActiveNames = @(),
+        [string[]]$NlmActiveNames = @(),
+        [object[]]$IdentityCorrelations = @()
     )
     $activeSet = @{}
     foreach ($n in @($ActiveNames + $NlmActiveNames)) { if ($n) { $activeSet[$n.ToLowerInvariant()] = $true } }
+    $identityIndex = @{}
+    foreach ($i in @($IdentityCorrelations)) { if ($i.ProfileKeyName) { $identityIndex[(Normalize-NRGuidKey -Value $i.ProfileKeyName)] = $i } }
 
     foreach ($p in $RegistryProfiles) {
         if ([string]::IsNullOrWhiteSpace($p.ProfileName)) { continue }
@@ -122,6 +94,10 @@ function Get-NRSuspiciousProfiles {
         $numbered = $name -match '^(网络|Network)\s+\d+$'
         $isActive = $activeSet.ContainsKey($name.ToLowerInvariant())
         $managed = ($p.Managed -eq 1 -or $p.Managed -eq $true)
+        $identity = $null
+        $normalizedKey = Normalize-NRGuidKey -Value $p.KeyName
+        if ($normalizedKey -and $identityIndex.ContainsKey($normalizedKey)) { $identity = $identityIndex[$normalizedKey] }
+        if ($identity -and $identity.NlmIsConnected) { $isActive = $true }
         $score = 0
         $codes = New-Object System.Collections.Generic.List[string]
         $reasons = New-Object System.Collections.Generic.List[string]
@@ -129,6 +105,8 @@ function Get-NRSuspiciousProfiles {
         if ($numbered -and -not $isActive) { $score += 10; [void]$reasons.Add('当前不是活动连接') }
         if ($p.LastWrite -and ((Get-Date) - [datetime]$p.LastWrite).TotalDays -ge 30 -and $numbered) { $score += 10; [void]$reasons.Add('记录已超过 30 天未修改') }
         if ($managed) { $score += 80; [void]$codes.Add('NR1003'); [void]$reasons.Add('Managed Profile，禁止自动修改') }
+        if ($identity -and $identity.Correlation -eq 'ExactNetworkId') { [void]$reasons.Add('已通过 NetworkId 与 Network List Manager 精确关联') }
+        if ($identity -and $identity.NlmIsConnected -and $numbered) { $score += 80; [void]$codes.Add('NR1002'); [void]$reasons.Add('Network List Manager 报告该网络当前已连接') }
         if ($isActive -and $numbered) { $score += 70; [void]$codes.Add('NR1002'); [void]$reasons.Add('当前仍为活动连接，禁止自动删除') }
         $level = if ($score -ge 70) { 'High' } elseif ($score -ge 45) { 'Caution' } elseif ($score -ge 25) { 'Low' } else { 'None' }
         $remediationAllowed = $numbered -and (-not $isActive) -and (-not $managed)
@@ -145,6 +123,10 @@ function Get-NRSuspiciousProfiles {
             RemediationAllowed = $remediationAllowed
             DiagnosticCodes = @($codes)
             Reasons = @($reasons)
+            NetworkId = if ($identity) { $identity.NetworkId } else { $null }
+            NetworkName = if ($identity) { $identity.NetworkName } else { $null }
+            NetworkCorrelation = if ($identity) { $identity.Correlation } else { 'None' }
+            NlmIsConnected = if ($identity) { $identity.NlmIsConnected } else { $false }
             Reason = if ($reasons.Count) { $reasons -join '；' } else { '正常或未命中安全清理规则' }
             RegistryPath = $p.RegistryPath
             LastWrite = $p.LastWrite
@@ -163,7 +145,8 @@ function Get-NRDiagnostics {
     $nlm = Get-NRNetworkListManagerNetworks
     $activeNames = @(Get-NRActiveProfileNames)
     $nlmActiveNames = if ($nlm.Available) { @($nlm.Networks | Where-Object IsConnected | Select-Object -ExpandProperty Name -Unique) } else { @() }
-    $suspects = @(Get-NRSuspiciousProfiles -RegistryProfiles $registryProfiles -ActiveNames $activeNames -NlmActiveNames $nlmActiveNames)
+    $identityCorrelations = if ($nlm.Available) { @(Get-NRNetworkIdentityCorrelation -RegistryProfiles $registryProfiles -NlmNetworks $nlm.Networks) } else { @() }
+    $suspects = @(Get-NRSuspiciousProfiles -RegistryProfiles $registryProfiles -ActiveNames $activeNames -NlmActiveNames $nlmActiveNames -IdentityCorrelations $identityCorrelations)
 
     $ip = Get-NRIPDiagnostics
     $gateways = @(Test-NRGateways -Configurations $ip)
@@ -197,6 +180,7 @@ function Get-NRDiagnostics {
         ActiveProfileNames = @($activeNames)
         NlmActiveProfileNames = @($nlmActiveNames)
         NetworkListManager = $nlm
+        NetworkIdentityCorrelations = @($identityCorrelations)
         RegistryProfiles = @($registryProfiles)
         Candidates = @($suspects)
         IPConfiguration = @($ip)
@@ -223,7 +207,11 @@ function Show-NRDiagnostics {
     else { foreach ($c in $Diagnostics.Connections) { Write-NRLine ('{0} | 网卡={1} | 类型={2} | IPv4={3} | IPv6={4}' -f $c.Name, $c.InterfaceAlias, $c.NetworkCategory, $c.IPv4Connectivity, $c.IPv6Connectivity) } }
 
     Write-NRSection 'Network List Manager'
-    if ($Diagnostics.NetworkListManager.Available) { Write-NRLine ('已读取 {0} 个网络对象。' -f $Diagnostics.NetworkListManager.Networks.Count) 'Green' }
+    if ($Diagnostics.NetworkListManager.Available) {
+        Write-NRLine ('已读取 {0} 个网络对象。' -f $Diagnostics.NetworkListManager.Networks.Count) 'Green'
+        $exact = @($Diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
+        Write-NRLine ('Profile ↔ NetworkId 精确关联：{0} 个。' -f $exact) 'Green'
+    }
     else { Write-NRLine 'Network List Manager COM 不可用，已回退到 PowerShell/注册表诊断。' 'Yellow' }
 
     Write-NRSection 'IP / DHCP / 网关 / DNS'

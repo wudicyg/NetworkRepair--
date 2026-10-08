@@ -2,7 +2,9 @@
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
-> 当前版本：**0.2.0**
+> 当前稳定版本：**0.2.0**
+
+开发分支：**0.3.0-dev**
 
 NetworkRepair 的目标不是“暴力清理注册表”，而是：
 
@@ -26,6 +28,8 @@ NetworkRepair 的目标不是“暴力清理注册表”，而是：
 - 风险评分与可解释诊断码
 - IP / DHCP / 默认网关 / DNS 诊断
 - NCSI DNS / HTTP 探测
+- Profile GUID ↔ NetworkId 精确关联
+- 基于 Network List Manager 的显式网络重命名
 
 ## 快速开始
 
