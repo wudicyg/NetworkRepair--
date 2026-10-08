@@ -1,4 +1,4 @@
-﻿# NetworkRepair
+# NetworkRepair
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
@@ -53,11 +53,15 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 
 ### 普通用户（推荐）
 
-从 [Releases](https://github.com/wudicyg/NetworkRepair--/releases) 下载后**双击 `网络修复工具.exe`** 即可：单文件封装、免安装，不需要在多个文件之间挑选。
+从 [Releases](https://github.com/wudicyg/NetworkRepair--/releases) 下载后**双击程序即可**：单文件封装、免安装，不需要在多个文件之间挑选。
 
+- **`NetworkRepair-<版本>-Portable.exe`**：主程序本身，下载后直接双击，不用解压。
+- **`NetworkRepair_<版本>_Windows.zip`**：完整发布包，解压后双击里面的 `网络修复工具.exe`（同一个程序）。
 - 首次运行会弹出「用户账户控制」，选择「是」——本工具需要管理员权限才能读写网络配置。
 - 若 exe 被安全软件拦截，改用 `备用启动\启动-网络修复工具.bat`，效果完全相同。
 - 完整操作说明见 [使用说明.md](使用说明.md)。
+
+> 发布页附件名使用 ASCII：GitHub 会剥掉附件名中的中文字符，因此中文名称以附件标签展示，包内入口仍是中文名。
 
 ### 从源码运行
 

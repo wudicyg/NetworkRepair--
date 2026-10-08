@@ -50,7 +50,10 @@ if ([string]::IsNullOrWhiteSpace($version)) {
     throw 'NetworkRepair version is empty.'
 }
 if ([string]::IsNullOrWhiteSpace($PortableExecutableName)) {
-    $PortableExecutableName = ('网络修复工具_{0}.exe' -f $version)
+    # 发布页附件名必须是 ASCII：GitHub 会剥掉附件名里的非 ASCII 字符（实测上传
+    # 「网络修复工具_1.0.0.exe」会存成「_1.0.0.exe」）。中文名称改由发布流水线写入附件 label，
+    # 包内的用户可见入口仍然是中文名。
+    $PortableExecutableName = ('NetworkRepair-{0}-Portable.exe' -f $version)
 }
 
 $packageName = 'NetworkRepair_{0}_Windows' -f $version

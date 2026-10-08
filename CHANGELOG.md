@@ -1,6 +1,6 @@
-﻿# Changelog
+# Changelog
 
-## Unreleased
+## [1.1.0] - 2026-10-08
 
 ### Added
 - **多级恢复点**：备份现在带等级（`Manual` / `PreRepair` / `PreRestore`）与固定标记，新增 `src/RestorePoints.ps1` 提供恢复点列举、完整性检查、保留策略计算与显式确认后的清理；`Restore` 支持按恢复点序号恢复（`-RestorePointIndex`），新增 `-Mode RestorePoints` 与 `-Mode Prune`。安全点（PreRepair/PreRestore）与已固定恢复点享有更高保留下限，清理只允许删除备份根目录的直接子目录。
@@ -8,6 +8,7 @@
 - 新增 `Write-NRSafeLog`：没有日志文件上下文时（例如单元测试直接点源模块）静默跳过，避免日志写入失败打断主流程。
 - **面向普通用户的单文件分发**：新增 `tools/New-NRSingleFileDistribution.ps1`，把入口脚本与 `src/` 下 11 个模块按点源顺序压平成单个脚本，并用 ps2exe 编译成单文件 `网络修复工具.exe`（默认嵌入 requireAdministrator 清单，并经字节校验确认），同时生成纯 ASCII 的备用启动器。发布包改为「一个显眼入口」布局：`网络修复工具.exe` + `使用说明.md` + `备用启动\启动-网络修复工具.bat`；zip 改用 ZipFile + UTF-8 条目名写入，中文文件名解压后不再乱码；Release 额外附带可直接下载的便携 exe 与其校验文件。
 - 新增面向普通用户的中文说明 `使用说明.md`：第一句话就说明「双击哪个文件」。
+- 发布页附件命名：GitHub 会**剥掉附件名里的非 ASCII 字符**（实测上传 `网络修复工具_1.0.0.exe` 会存成 `_1.0.0.exe`），因此附件名改用 ASCII 的 `NetworkRepair-<版本>-Portable.exe`，中文名称改由附件的 `label` 字段承载（新增 `tools/Set-NRReleaseAssetLabels.ps1`）。包**内**的用户可见入口仍然是中文名。
 
 ### Changed
 - 网络重命名前的自动备份也使用 `PreRepair` 安全点等级，与修复、恢复路径保持一致，避免修改前的安全点被当作普通恢复点优先清理。
