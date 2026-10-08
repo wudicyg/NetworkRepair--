@@ -1,4 +1,4 @@
-# NetworkRepair
+# NetMedic
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
@@ -11,13 +11,13 @@
 
 当前主分支：**1.0.0**
 
-NetworkRepair 的目标不是“暴力清理注册表”，而是：
+NetMedic 的目标不是“暴力清理注册表”，而是：
 
 **先诊断 → 先备份 → 再修改 → 最后验证 → 失败回滚。**
 
 ## 项目定位
 
-NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windows 长期使用后不断累积的编号网络 Profile，例如 `网络 2`、`网络 3`、`网络 4`、`Network 2` 等历史遗留项。
+NetMedic 的核心任务不是“重置整个网络”，而是解决 Windows 长期使用后不断累积的编号网络 Profile，例如 `网络 2`、`网络 3`、`网络 4`、`Network 2` 等历史遗留项。
 
 网络连通性诊断与修复属于配套能力：当网络本身正常时，工具不会为了测试而盲目修改系统；当网络正常但存在符合安全规则的历史编号 Profile 时，仍会独立识别并提供清理计划。
 
@@ -43,7 +43,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - 基于 Network List Manager 的显式网络重命名
 - 独立 Repair Planner：统一修复决策与真实执行计划
 - Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
-- Restore 只导入 NetworkRepair 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
+- Restore 只导入 NetMedic 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
 - 多级恢复点：备份按 `Manual` / `PreRepair` / `PreRestore` 分级，可列举、按序号恢复、固定保护，并按保留额度显式清理
 - 按需服务刷新：仅在 `NetworkList` 范围真实改动后，按依赖顺序刷新 `NlaSvc` / `netprofm`，有界等待服务与 Network List Manager COM 恢复可用，并把刷新结果回传到修复、恢复与重命名结果
@@ -56,13 +56,13 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 
 ### 普通用户（推荐）
 
-从 [Releases](https://github.com/wudicyg/NetworkRepair--/releases) 下载后**双击程序即可**：单文件封装、免安装，不需要在多个文件之间挑选。
+从 [Releases](https://github.com/wudicyg/netmedic/releases) 下载后**双击程序即可**：单文件封装、免安装，不需要在多个文件之间挑选。
 
-- **`NetworkRepair-<版本>-Portable.exe`**：主程序本身，下载后直接双击，不用解压。
-- **`NetworkRepair_<版本>_Windows.zip`**：完整发布包，解压后双击里面的 `网络修复工具.exe`（同一个程序）。
+- **`NetMedic-<版本>-Portable.exe`**：主程序本身，下载后直接双击，不用解压。
+- **`NetMedic_<版本>_Windows.zip`**：完整发布包，解压后双击里面的 `网络医生.exe`（同一个程序）。
 - 打开后是**图形界面**：顶部五张状态卡 + 一键操作按钮，点修复前会先展示本次修复计划并要求确认。
 - 首次运行会弹出「用户账户控制」，选择「是」——本工具需要管理员权限才能读写网络配置。
-- 若 exe 被安全软件拦截，改用 `备用启动\启动-网络修复工具.bat`（打开的是控制台菜单版），功能完全相同。
+- 若 exe 被安全软件拦截，改用 `备用启动\启动-网络医生.bat`（打开的是控制台菜单版），功能完全相同。
 - 完整操作说明见 [使用说明.md](使用说明.md)。
 
 > 发布页附件名使用 ASCII：GitHub 会剥掉附件名中的中文字符，因此中文名称以附件标签展示，包内入口仍是中文名。
@@ -170,7 +170,7 @@ backups/
 - `NetworkList-NewNetworks.reg`：存在该键时，Restore 实际导入和校验的 `NewNetworks` 范围。
 - `diagnostic.json` / `manifest.json`：保存诊断与备份元数据。
 
-Restore 不再直接导入完整的 `NetworkList.reg`，以避免把 NetworkRepair 未管理的 Registry 子树一并覆盖。恢复失败时，工具会自动使用 Restore 前刚创建的安全备份，仅回滚上述 managed scopes。
+Restore 不再直接导入完整的 `NetworkList.reg`，以避免把 NetMedic 未管理的 Registry 子树一并覆盖。恢复失败时，工具会自动使用 Restore 前刚创建的安全备份，仅回滚上述 managed scopes。
 
 ### 恢复点等级与保留
 
@@ -219,7 +219,7 @@ logs/
 ## 项目结构
 
 ```text
-NetworkRepair/
+NetMedic/
 ├─ NetworkRepair.bat
 ├─ NetworkRepair.ps1
 ├─ src/
@@ -247,7 +247,7 @@ NetworkRepair/
 │  ├─ Test-NRReleasePackage.ps1
 │  └─ Set-NRReleaseAssetLabels.ps1
 ├─ assets/
-│  └─ NetworkRepair.ico
+│  └─ NetMedic.ico
 ├─ docs/
 ├─ backups/
 ├─ logs/
@@ -262,18 +262,19 @@ NetworkRepair/
 发布包面向普通用户的布局（发布页下载的 zip 解压后）：
 
 ```text
-NetworkRepair_<版本>_Windows/
-├─ 网络修复工具.exe              ← 双击这个即可
+NetMedic_<版本>_Windows/
+├─ 网络医生.exe              ← 双击这个即可
 ├─ 使用说明.md                  ← 中文快速上手
 ├─ 备用启动/
-│  └─ 启动-网络修复工具.bat      ← exe 被安全软件拦截时使用
+│  └─ 启动-网络医生.bat      ← exe 被安全软件拦截时使用
 ├─ NetworkRepair.single.ps1     ← 与 exe 内容相同的单文件脚本（便于审计）
 ├─ NetworkRepair.ps1 + src/     ← 开发用源码入口与模块
 ├─ tools/  docs/                ← 维护工具与设计文档
 └─ README.md / CHANGELOG.md / LICENSE / ...
 ```
 
-发布页还会单独提供 `网络修复工具_<版本>.exe`，可直接下载、无需解压。
+发布页还会单独提供便携版 exe，可直接下载、无需解压。注意 GitHub 会剥掉附件名里的非 ASCII 字符，
+因此发布页上的文件名是 `NetMedic-<版本>-Portable.exe` 这样的英文名，中文名称显示在附件说明（label）上。
 
 ## 系统要求
 
@@ -281,7 +282,7 @@ NetworkRepair_<版本>_Windows/
 - Windows PowerShell 5.1
 - 管理员权限
 
-NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，并以 Network List Manager 所提供的网络信息模型为设计依据。
+NetMedic 使用 Windows `NetConnection` 模块获取 Connection Profile，并以 Network List Manager 所提供的网络信息模型为设计依据。
 
 ## 开发文档
 
