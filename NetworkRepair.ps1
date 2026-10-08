@@ -52,7 +52,7 @@ function Show-NRQuickStatus {
 
         $safeCandidates = @($suspects | Where-Object { $_.RemediationAllowed })
         $numberedProfiles = @($suspects | Where-Object {
-            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+
+            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network) +[0-9]+
     Write-NRLine ''
     Write-NRLine '当前可用操作：' 'White'
     Write-NRLine '  [1] 自动诊断' 'White'
