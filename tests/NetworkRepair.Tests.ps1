@@ -78,6 +78,15 @@
         $r.DiagnosticCodes | Should -Contain 'NR1003'
     }
 
+    It 'keeps sanitized bundle numbered profile regexes intact' {
+        $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
+        $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
+        $content | Should -Match "\^网络\\s\+\\d\+\$"
+        $content | Should -Match "\^Network\\s\+\\d\+\$"
+        $content | Should -Match "\^\(网络\|Network\)\\s\+\\d\+\$"
+        $content | Should -Not -Match "网络s\+d\+"
+        $content | Should -Not -Match "Networks\+d\+"
+    }
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
     }
