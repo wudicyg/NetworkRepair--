@@ -46,6 +46,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
 - Restore 导入后进行 `NetworkList.reg` 快照校验，失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
+- 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair / Dry Run 前仍执行完整重新诊断
 
 ## 快速开始
 
@@ -216,7 +217,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-当前 `main` 已包含 v0.4 的 Repair Planner、Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读发布验收证据采集，以及 Safe Repair 执行过程反馈。正式稳定版仍需完成 Windows 10 / 11 多版本实机矩阵、更多语言环境与发布包验证。后续重点是 TUI 增强、脱敏诊断包和多级恢复点。
+当前 `main` 已包含 v0.4 的 Repair Planner、Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。正式稳定版仍需完成 Windows 10 / 11 多版本实机矩阵、更多语言环境与最终发布验收。
 
 ## License
 
