@@ -1,4 +1,4 @@
-# NetworkRepair
+﻿# NetworkRepair
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
@@ -33,6 +33,7 @@ NetworkRepair 的目标不是“暴力清理注册表”，而是：
 - 独立 Repair Planner：统一 Dry Run 与真实修复的操作计划
 - Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
 - Restore 导入后进行 `NetworkList.reg` 快照校验，失败自动回到恢复前安全备份
+- 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
 
 ## 快速开始
 
@@ -152,7 +153,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-当前 `main` 已包含 v0.4 的 Repair Planner 与 Restore 快照校验闭环，但正式稳定版仍需完成 Windows 10 / 11 实机矩阵、更多语言环境和发布包验证。后续重点是 TUI 增强、脱敏诊断包和多级恢复点。
+当前 `main` 已包含 v0.4 的 Repair Planner、Restore 快照校验和“网络健康 / Profile 历史遗留”双轨判定。正式稳定版仍需完成 Windows 10 / 11 实机矩阵、更多语言环境和发布包验证。后续重点是 TUI 增强、脱敏诊断包和多级恢复点。
 
 ## License
 
