@@ -205,6 +205,19 @@
         $decision.Plan.IsNoOp | Should -BeTrue
     }
 
+    It 'blocks Deep Repair when the network is healthy and no safe cleanup exists' {
+        $connections=@([pscustomobject]@{IPv4Connectivity='Internet';IPv6Connectivity='Internet'})
+        $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
+        $h=Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+        $candidate=[pscustomobject]@{KeyName='x';ProfileName='Network 8';RemediationAllowed=$false;IsActive=$true;RiskLevel='High';RiskScore=90;Reason='active'}
+        $diagnostics=[pscustomobject]@{Candidates=@($candidate);NetworkHealth=$h}
+        $decision=Get-NRRepairDecision -Diagnostics $diagnostics -Deep
+        $decision.Recommendation | Should -Be 'NoAction'
+        $decision.Plan.IsNoOp | Should -BeTrue
+        $decision.Plan.DeleteProfileCount | Should -Be 0
+        $decision.Plan.ClearNewNetworksRequested | Should -BeFalse
+    }
+
     It 'does not classify a healthy numbered active profile as safe cleanup' {
         $connections=@([pscustomobject]@{IPv4Connectivity='Internet'})
         $ncsi=[pscustomobject]@{Skipped=$false;Dns=$true;Http=$true}
