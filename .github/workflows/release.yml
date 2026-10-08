@@ -48,12 +48,18 @@ jobs:
       - name: Run Pester
         run: Invoke-Pester .\tests\NetworkRepair.Tests.ps1 -Output Detailed
 
+      - name: Install ps2exe
+        run: Install-Module ps2exe -Force -Scope CurrentUser -SkipPublisherCheck
+
       - name: Build release package
         run: |
           $result = & .\tools\New-NRReleasePackage.ps1 -OutputDirectory .\release | ConvertFrom-Json
           if (-not $result.Success) { throw 'Release package build failed.' }
           Write-Host "Package: $($result.Package)"
           Write-Host "SHA256: $($result.Sha256Value)"
+          Write-Host "Entry: $($result.EntryName)"
+          Write-Host "Portable exe: $($result.PortableExe)"
+          Write-Host "Elevation manifest verified: $($result.ElevationVerified)"
 
       - name: Upload release package artifact
         uses: actions/upload-artifact@v4
@@ -62,20 +68,27 @@ jobs:
           path: |
             release/*.zip
             release/*.sha256
+            release/*.exe
           if-no-files-found: error
 
       - name: Create GitHub release
         run: |
           $zip = Get-ChildItem .\release\*.zip | Select-Object -First 1
-          $sha = Get-ChildItem .\release\*.sha256 | Select-Object -First 1
-          if (-not $zip -or -not $sha) { throw 'Release artifacts not found.' }
+          if (-not $zip) { throw 'Release ZIP not found.' }
+          $zipSha = Get-ChildItem .\release\*.sha256 | Where-Object { $_.BaseName -eq $zip.BaseName } | Select-Object -First 1
+          $portable = Get-ChildItem .\release\*.exe | Select-Object -First 1
+          if (-not $portable) { throw 'Portable single-file executable was not produced.' }
+          $portableSha = Get-ChildItem .\release\*.sha256 | Where-Object { $_.BaseName -eq $portable.BaseName } | Select-Object -First 1
+          if (-not $zipSha -or -not $portableSha) { throw 'Release checksum files not found.' }
 
           $releaseArgs = @(
             'release'
             'create'
             $env:GITHUB_REF_NAME
             $zip.FullName
-            $sha.FullName
+            $zipSha.FullName
+            $portable.FullName
+            $portableSha.FullName
             '--title'
             "NetworkRepair $env:GITHUB_REF_NAME"
             '--generate-notes'
