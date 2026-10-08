@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- **多级恢复点**：备份现在带等级（`Manual` / `PreRepair` / `PreRestore`）与固定标记，新增 `src/RestorePoints.ps1` 提供恢复点列举、完整性检查、保留策略计算与显式确认后的清理；`Restore` 支持按恢复点序号恢复（`-RestorePointIndex`），新增 `-Mode RestorePoints` 与 `-Mode Prune`。安全点（PreRepair/PreRestore）与已固定恢复点享有更高保留下限，清理只允许删除备份根目录的直接子目录。
+
 ### Changed
 - 明确 Issues 与 Discussions 的分工：新增协作流程文档 `docs/collaboration.md`，Issue 模板页增加 Q&A / Ideas / 私密安全报告入口，`CONTRIBUTING.md` 补充分支命名与 PR 门禁。
 
