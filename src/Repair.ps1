@@ -1,4 +1,4 @@
-function Remove-NRProfile {
+﻿function Remove-NRProfile {
     param([Parameter(Mandatory)]$Profile)
     if ($Profile.IsActive) { throw ('拒绝删除当前活动 Profile：{0}' -f $Profile.ProfileName) }
     if (-not $Profile.RemediationAllowed) { throw ('拒绝删除未通过自动修复安全门槛的 Profile：{0}' -f $Profile.ProfileName) }
