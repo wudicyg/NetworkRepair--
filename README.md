@@ -211,6 +211,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 - [Windows 10 / 11 发布验证](docs/release-validation.md)
 - [架构设计](docs/architecture.md)
 - [路线图](docs/roadmap.md)
+- [协作流程](docs/collaboration.md)
 - [诊断代码](docs/diagnostic-codes.md)
 
 ## 项目路线
