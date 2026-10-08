@@ -8,6 +8,36 @@
         . (Join-Path $root 'src\Ncsi.ps1')
         . (Join-Path $root 'src\Diagnostics.ps1')
         . (Join-Path $root 'src\Backup.ps1')
+        . (Join-Path $root 'src\RestorePoints.ps1')
+
+        function New-TestRestorePoint {
+            param(
+                [Parameter(Mandatory)][string]$Root,
+                [Parameter(Mandatory)][string]$Name,
+                [Parameter(Mandatory)][string]$Timestamp,
+                [string]$Level = 'Manual',
+                [switch]$Pinned,
+                [switch]$SkipScopedFiles,
+                [string]$ManifestContent
+            )
+            $path = Join-Path $Root $Name
+            New-Item -ItemType Directory -Path $path -Force | Out-Null
+            @('x') | Set-Content -LiteralPath (Join-Path $path 'NetworkList.reg') -Encoding UTF8
+            if (-not $SkipScopedFiles) {
+                @('x') | Set-Content -LiteralPath (Join-Path $path 'NetworkList-Profiles.reg') -Encoding UTF8
+            }
+            $manifestPath = Join-Path $path 'manifest.json'
+            if ($ManifestContent) {
+                $ManifestContent | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+            } elseif ($Level) {
+                [pscustomobject]@{ App='NetworkRepair'; Version='1.0.0'; Level=$Level; Pinned=[bool]$Pinned; Timestamp=$Timestamp } |
+                    ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+            } else {
+                [pscustomobject]@{ App='NetworkRepair'; Version='0.4.0'; Timestamp=$Timestamp } |
+                    ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+            }
+            $path
+        }
     }
 
     It 'returns null for missing optional registry properties' {
@@ -389,5 +419,215 @@
         (Test-NRNetworkName -Name 'bad/name').Valid | Should -BeFalse
         (Test-NRNetworkName -Name '   ').Valid | Should -BeFalse
         (Test-NRNetworkName -Name 'Office').Valid | Should -BeTrue
+    }
+
+    It 'lists restore points newest first with levels and integrity state' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rp_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -Level 'Manual')
+            [void](New-TestRestorePoint -Root $dir -Name '20260102_010101_001' -Timestamp '2026-01-02T01:01:01.0000000+08:00' -Level 'PreRepair')
+
+            $points=@(Get-NRRestorePoints -BackupRoot $dir)
+            $points.Count | Should -Be 2
+            $points[0].Level | Should -Be 'PreRepair'
+            $points[0].Index | Should -Be 1
+            $points[1].Level | Should -Be 'Manual'
+            $points[1].Index | Should -Be 2
+            $points[0].IsSafetyPoint | Should -BeTrue
+            $points[1].IsSafetyPoint | Should -BeFalse
+            $points[0].IsIntact | Should -BeTrue
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'treats restore points without level metadata as legacy manual points' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rplevel_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -Level '')
+            [void](New-TestRestorePoint -Root $dir -Name '20260102_010101_001' -Timestamp '2026-01-02T01:01:01.0000000+08:00' -Level 'FutureLevel')
+
+            $points=@(Get-NRRestorePoints -BackupRoot $dir)
+            @($points | Where-Object { $_.Name -eq '20260101_010101_001' })[0].Level | Should -Be 'Manual'
+            @($points | Where-Object { $_.Name -eq '20260102_010101_001' })[0].Level | Should -Be 'Unknown'
+
+            $plan=Get-NRRestorePointRetentionPlan -RestorePoints $points -KeepPerLevel 1
+            @($plan.Remove | Where-Object { $_.Level -eq 'Unknown' }).Count | Should -Be 0
+            @($plan.Keep | Where-Object { $_.Level -eq 'Unknown' }).Count | Should -Be 1
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'marks restore points with missing scoped files as incomplete and refuses to select them' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpbad_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -SkipScopedFiles)
+
+            $point=@(Get-NRRestorePoints -BackupRoot $dir)[0]
+            $point.Integrity | Should -Be 'Incomplete'
+            $point.IsIntact | Should -BeFalse
+            $point.MissingFiles | Should -Contain 'NetworkList-Profiles.reg'
+            { Resolve-NRRestorePoint -RestorePoints @($point) -Index 1 } | Should -Throw
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'does not throw when a restore point manifest is unreadable' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpjson_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -Level 'Manual' -ManifestContent '{ this is not json')
+
+            $point=@(Get-NRRestorePoints -BackupRoot $dir)[0]
+            $point.Integrity | Should -Be 'Unreadable'
+            $point.IsIntact | Should -BeFalse
+            $point.Level | Should -Be 'Manual'
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'rejects an out-of-range restore point index' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpidx_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00')
+            $points=@(Get-NRRestorePoints -BackupRoot $dir)
+            { Resolve-NRRestorePoint -RestorePoints $points -Index 7 } | Should -Throw
+            (Resolve-NRRestorePoint -RestorePoints $points -Index 1).Index | Should -Be 1
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'keeps the newest restore points per level and never removes pinned points' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpplan_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            $day=1
+            foreach ($level in @('Manual','Manual','Manual','Manual','PreRepair','PreRepair','PreRepair')) {
+                $pinned=$false
+                if ($day -eq 1) { $pinned=$true }
+                [void](New-TestRestorePoint -Root $dir -Name ('202601{0:d2}_010101_001' -f $day) -Timestamp ('2026-01-{0:d2}T01:01:01.0000000+08:00' -f $day) -Level $level -Pinned:$pinned)
+                $day++
+            }
+
+            $points=@(Get-NRRestorePoints -BackupRoot $dir)
+            $points.Count | Should -Be 7
+
+            $plan=Get-NRRestorePointRetentionPlan -RestorePoints $points -KeepPerLevel 2 -KeepSafetyPerLevel 3
+            @($plan.Keep | Where-Object { $_.Level -eq 'Manual' }).Count | Should -Be 3
+            @($plan.Remove | Where-Object { $_.Level -eq 'Manual' }).Count | Should -Be 1
+            @($plan.Keep | Where-Object { $_.Level -eq 'PreRepair' }).Count | Should -Be 3
+            @($plan.Remove | Where-Object { $_.Level -eq 'PreRepair' }).Count | Should -Be 0
+            $plan.RemoveCount | Should -Be 1
+            $plan.IsNoOp | Should -BeFalse
+            @($plan.Remove | Where-Object { $_.Pinned }).Count | Should -Be 0
+            @($plan.Keep | Where-Object { $_.Pinned }).Count | Should -Be 1
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'pins a restore point so it survives retention, and unpins it again' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rppin_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00')
+            [void](New-TestRestorePoint -Root $dir -Name '20260102_010101_001' -Timestamp '2026-01-02T01:01:01.0000000+08:00')
+
+            $oldest=(@(Get-NRRestorePoints -BackupRoot $dir) | Where-Object { $_.Name -eq '20260101_010101_001' })
+            (Set-NRRestorePointPin -Path $oldest.Path -Pinned).Pinned | Should -BeTrue
+
+            $plan=Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints -BackupRoot $dir) -KeepPerLevel 1
+            @($plan.Keep | Where-Object { $_.Name -eq '20260101_010101_001' }).Count | Should -Be 1
+            @($plan.Remove | Where-Object { $_.Name -eq '20260101_010101_001' }).Count | Should -Be 0
+
+            (Set-NRRestorePointPin -Path $oldest.Path).Pinned | Should -BeFalse
+            $planAfter=Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints -BackupRoot $dir) -KeepPerLevel 1
+            @($planAfter.Remove | Where-Object { $_.Name -eq '20260101_010101_001' }).Count | Should -Be 1
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'prunes only the planned restore points and verifies the remaining set' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpprune_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            foreach ($day in 1..3) {
+                [void](New-TestRestorePoint -Root $dir -Name ('202601{0:d2}_010101_001' -f $day) -Timestamp ('2026-01-{0:d2}T01:01:01.0000000+08:00' -f $day))
+            }
+            $plan=Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints -BackupRoot $dir) -KeepPerLevel 1
+            $plan.RemoveCount | Should -Be 2
+
+            $result=Invoke-NRRestorePointPrune -Plan $plan -BackupRoot $dir -AssumeYes
+            $result.Success | Should -BeTrue
+            $result.Verified | Should -BeTrue
+            $result.RemovedCount | Should -Be 2
+            $result.RemainingCount | Should -Be 1
+            (Test-Path -LiteralPath (Join-Path $dir '20260103_010101_001')) | Should -BeTrue
+            (Test-Path -LiteralPath (Join-Path $dir '20260101_010101_001')) | Should -BeFalse
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'refuses to delete restore point paths outside the backup root' {
+        $outer=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpouter_{0}'-f [guid]::NewGuid().ToString('N'))
+        $backupRoot=Join-Path $outer 'backups'
+        $victim=Join-Path $outer 'keep-me'
+        New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+        New-Item -ItemType Directory -Path $victim -Force | Out-Null
+        try {
+            $plan=[pscustomobject]@{ Remove=@([pscustomobject]@{ Path=$victim }) }
+            $result=Invoke-NRRestorePointPrune -Plan $plan -BackupRoot $backupRoot -AssumeYes
+            $result.RemovedCount | Should -Be 0
+            @($result.Skipped).Count | Should -Be 1
+            $result.Success | Should -BeFalse
+            (Test-Path -LiteralPath $victim) | Should -BeTrue
+        } finally {Remove-Item -LiteralPath $outer -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'does not delete anything when the retention plan has no candidates' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpnoop_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00')
+            $plan=Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints -BackupRoot $dir) -KeepPerLevel 5
+            $plan.IsNoOp | Should -BeTrue
+
+            $result=Invoke-NRRestorePointPrune -Plan $plan -BackupRoot $dir -AssumeYes
+            $result.Success | Should -BeTrue
+            $result.RemovedCount | Should -Be 0
+            $result.RemainingCount | Should -Be 1
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'reports prune candidates in the restore point summary' {
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpsum_{0}'-f [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        try {
+            foreach ($day in 1..3) {
+                [void](New-TestRestorePoint -Root $dir -Name ('202601{0:d2}_010101_001' -f $day) -Timestamp ('2026-01-{0:d2}T01:01:01.0000000+08:00' -f $day))
+            }
+            $summary=Get-NRRestorePointSummary -BackupRoot $dir -KeepPerLevel 2
+            $summary.Total | Should -Be 3
+            $summary.Manual | Should -Be 3
+            $summary.Pinned | Should -Be 0
+            $summary.NotIntact | Should -Be 0
+            $summary.PruneCandidates | Should -Be 1
+            @($summary.Points).Count | Should -Be 3
+        } finally {Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+
+    It 'wires multi-level restore points into the entry script, menu and backup levels' {
+        $entry=Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match ([regex]::Escape('RestorePoints.ps1'))
+        $entry | Should -Match ([regex]::Escape("'RestorePoints'"))
+        $entry | Should -Match ([regex]::Escape("'Prune'"))
+        $entry | Should -Match 'Restore-NRBackup -RestorePointIndex'
+        $entry | Should -Match 'Show-NRRestorePointList'
+        $entry | Should -Match 'Invoke-NRRestorePointPruneInteractive'
+        $entry | Should -Match 'Switch-NRRestorePointPin'
+        $entry | Should -Not -Match ([regex]::Escape("Write-NRLine '  [8]"))
+        $entry | Should -Not -Match '\bDryRun\b'
+
+        $backup=Get-Content -LiteralPath (Join-Path $root 'src\Backup.ps1') -Raw -Encoding UTF8
+        $backup | Should -Match ([regex]::Escape('Level=$Level;Pinned=$false'))
+        $backup | Should -Match ([regex]::Escape("New-NRBackup -Level 'PreRestore'"))
+        $backup | Should -Match 'RestorePointIndex'
+
+        $repair=Get-Content -LiteralPath (Join-Path $root 'src\Repair.ps1') -Raw -Encoding UTF8
+        $repair | Should -Match ([regex]::Escape("New-NRBackup -Level 'PreRepair'"))
     }
 }
