@@ -6,15 +6,19 @@
 - **多级恢复点**：备份现在带等级（`Manual` / `PreRepair` / `PreRestore`）与固定标记，新增 `src/RestorePoints.ps1` 提供恢复点列举、完整性检查、保留策略计算与显式确认后的清理；`Restore` 支持按恢复点序号恢复（`-RestorePointIndex`），新增 `-Mode RestorePoints` 与 `-Mode Prune`。安全点（PreRepair/PreRestore）与已固定恢复点享有更高保留下限，清理只允许删除备份根目录的直接子目录。
 - **更精细的服务刷新策略**：新增 `src/Services.ps1`。刷新按实际影响范围决策（没有注册表改动时跳过，不再无条件重启网络服务）、按依赖顺序重启（停止 netprofm → NlaSvc，启动反向）、在有界超时内轮询服务状态，并以 Network List Manager COM 是否恢复可用作为就绪判据，替代原先的固定 `Start-Sleep 2`；被 `-Force` 连带停止的清单外依赖服务会先记录并随后一并拉起，原本未运行/未安装的服务不主动启动。刷新结果（`Refreshed` / `NotRunning` / `Missing` / `Failed` / `Collateral` / `ComReady` / `Degraded`）会回传到修复、恢复与重命名的返回对象，降级时给出可见提示。
 - 新增 `Write-NRSafeLog`：没有日志文件上下文时（例如单元测试直接点源模块）静默跳过，避免日志写入失败打断主流程。
+- **面向普通用户的单文件分发**：新增 `tools/New-NRSingleFileDistribution.ps1`，把入口脚本与 `src/` 下 11 个模块按点源顺序压平成单个脚本，并用 ps2exe 编译成单文件 `网络修复工具.exe`（默认嵌入 requireAdministrator 清单，并经字节校验确认），同时生成纯 ASCII 的备用启动器。发布包改为「一个显眼入口」布局：`网络修复工具.exe` + `使用说明.md` + `备用启动\启动-网络修复工具.bat`；zip 改用 ZipFile + UTF-8 条目名写入，中文文件名解压后不再乱码；Release 额外附带可直接下载的便携 exe 与其校验文件。
+- 新增面向普通用户的中文说明 `使用说明.md`：第一句话就说明「双击哪个文件」。
 
 ### Changed
 - 网络重命名前的自动备份也使用 `PreRepair` 安全点等级，与修复、恢复路径保持一致，避免修改前的安全点被当作普通恢复点优先清理。
-
-### Changed
 - 明确 Issues 与 Discussions 的分工：新增协作流程文档 `docs/collaboration.md`，Issue 模板页增加 Q&A / Ideas / 私密安全报告入口，`CONTRIBUTING.md` 补充分支命名与 PR 门禁。
+- 发布包不再包含旧 ASCII 启动器 `NetworkRepair.bat`（仅保留在源码仓库中），避免普通用户在多个入口之间犹豫。
 
 ### Fixed
 - 删除 `.github/pull_request_template.md`：它与 `.github/PULL_REQUEST_TEMPLATE.md` 仅大小写不同，在 Windows 上检出会产生文件冲突，且内容仍在引用 1.0.0 已移除的 Dry Run。
+- **修复打包成 exe 后无法启动**：入口脚本原先用 `$MyInvocation.MyCommand.Path` 推导根目录，而 ps2exe 宿主没有该属性，在 `Set-StrictMode -Version Latest` 下会直接抛「找不到属性 Path」。现在按「脚本路径 → PSCommandPath → 进程映像 → 应用程序基目录」顺序回退，并记录宿主类型。
+- 提权重启现在区分宿主：脚本宿主以 `-File` 重新运行入口脚本，已打包的 exe 则直接以管理员身份重启自身。
+- 新增测试守住 `.ps1` 必须带 UTF-8 BOM 的约定：PowerShell 5.1 在中文区域会按 ANSI 解码没有 BOM 的脚本，中文注释里的多字节序列会被还原成引号或括号，导致脚本解析直接失败。
 
 ## [1.0.0] - 2026-10-08
 
