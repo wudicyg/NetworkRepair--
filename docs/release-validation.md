@@ -1,6 +1,6 @@
-﻿# Release Validation
+﻿# 1.0.0 Release Validation
 
-NetworkRepair 的 CI 负责脚本语法、Pester 与发布包回归；0.4.0 的核心行为验收以 Windows 10 PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows Build 与语言环境作为后续扩展兼容性验证，不阻塞 0.4.0。
+NetworkRepair 的 CI 负责脚本语法、Pester 与发布包回归；1.0.0 的核心行为验收以 Windows 10 PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows Build 与语言环境作为后续扩展兼容性验证，不阻塞 1.0.0。
 
 ## 只读证据采集
 
@@ -126,6 +126,6 @@ ProtectedNumberedProfilesPresent
 
 不要把 Wi-Fi 密码、VPN 凭据或其他秘密数据上传到 Issue。
 
-## 0.4.0 发布验收结论
+## 1.0.0 发布验收结论
 
-当前 0.4.0 的核心目标是安全识别并清理非活动、非 Managed 的 `网络 N` / `Network N` 历史 Profile。该路径已经在真实 Windows 10 / PowerShell 5.1 环境完成实际运行验证。Windows 11 与更多环境组合继续保留测试入口，但不再作为 0.4.0 的发布阻塞项。
+当前 1.0.0 的核心目标是安全识别并清理非活动、非 Managed 的 `网络 N` / `Network N` 历史 Profile。该路径已经在真实 Windows 10 / PowerShell 5.1 环境完成实际运行验证。Windows 11 与更多环境组合继续保留测试入口，但不再作为 1.0.0 的发布阻塞项。
