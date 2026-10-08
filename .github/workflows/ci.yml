@@ -108,3 +108,18 @@ jobs:
           if (-not (Select-String -LiteralPath .\.github\workflows\release.yml -Pattern '--verify-tag' -Quiet)) {
             throw 'Release workflow tag verification is missing.'
           }
+      - name: Verify release package checksum
+        run: |
+          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
+          $shaFile = Get-ChildItem .\release-check\*.sha256 | Select-Object -First 1
+          if (-not $zip -or -not $shaFile) { throw 'Release package checksum inputs are missing.' }
+          $lines = @(Get-Content -LiteralPath $shaFile.FullName -Encoding ASCII | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+          if ($lines.Count -ne 1) { throw 'Release SHA-256 file must contain exactly one non-empty line.' }
+          $parts = $lines[0] -split '\s+', 2
+          if ($parts.Count -ne 2 -or $parts[0].Length -ne 64 -or $parts[0] -notmatch '^[0-9a-fA-F]{64}$') { throw 'Release SHA-256 file format is invalid.' }
+          $expectedHash = $parts[0].ToLowerInvariant()
+          $expectedName = $parts[1].Trim()
+          if ($expectedName -ne $zip.Name) { throw ('Checksum filename does not match ZIP name: {0}' -f $expectedName) }
+          $actualHash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) { throw ('Release SHA-256 mismatch. Expected {0}, actual {1}.' -f $expectedHash, $actualHash) }
+          Write-Host ('Release SHA-256 verified: {0}' -f $actualHash)
