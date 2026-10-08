@@ -31,14 +31,19 @@
         }
     }
 
+    $deleteCount=@($actions | Where-Object { $_.Action -eq 'DeleteProfile' }).Count
+    $clearRequested=(@($actions | Where-Object { $_.Action -eq 'ClearNewNetworks' }).Count -gt 0)
+    $requiresBackup=($actions.Count -gt 0)
+    $isNoOp=($actions.Count -eq 0)
+
     [pscustomobject]@{
         Deep = [bool]$Deep
         SafeCandidates = @($safe)
         SkippedCandidates = @($skipped)
         Actions = @($actions)
-        DeleteProfileCount = @($actions | Where-Object { $_.Action -eq 'DeleteProfile' }).Count
-        ClearNewNetworksRequested = [bool](($actions | Where-Object { $_.Action -eq 'ClearNewNetworks' }).Count -gt 0)
-        RequiresBackup = [bool]($actions.Count -gt 0)
-        IsNoOp = ($actions.Count -eq 0)
+        DeleteProfileCount = $deleteCount
+        ClearNewNetworksRequested = $clearRequested
+        RequiresBackup = $requiresBackup
+        IsNoOp = $isNoOp
     }
 }
