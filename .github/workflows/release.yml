@@ -101,3 +101,11 @@ jobs:
           gh @releaseArgs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Chinese asset labels
+        run: |
+          # GitHub strips non-ASCII characters from release asset names, so the Chinese
+          # display names are applied as asset labels by a BOM-protected repository script.
+          & .\tools\Set-NRReleaseAssetLabels.ps1 -Tag $env:GITHUB_REF_NAME
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
