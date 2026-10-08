@@ -861,4 +861,31 @@
         }
         $offenders.Count | Should -Be 0 -Because ('工作流文件必须保持纯 ASCII：' + ($offenders -join ', '))
     }
+
+    It 'declares a releasable application version' {
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $version = ([regex]::Match($entry, "AppVersion\s*=\s*'([^']+)'")).Groups[1].Value
+        $version | Should -Match '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$'
+
+        # 发布工作流要求标签版本与程序版本完全一致；发布前 CHANGELOG 必须已经写明该版本。
+        $changelog = Get-Content -LiteralPath (Join-Path $root 'CHANGELOG.md') -Raw -Encoding UTF8
+        $changelog | Should -Match ([regex]::Escape('## [' + $version + ']'))
+    }
+
+    It 'keeps release asset names ASCII because GitHub strips other characters' {
+        # 实测：上传「网络修复工具_1.0.0.exe」会被 GitHub 存成「_1.0.0.exe」，非 ASCII 字符丢失。
+        $packager = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRReleasePackage.ps1') -Raw -Encoding UTF8
+        $packager | Should -Match ([regex]::Escape('NetworkRepair-{0}-Portable.exe'))
+
+        # 中文显示名改由附件 label 承载，并且打标签逻辑放在带 BOM 的仓库脚本里，
+        # 这样发布工作流步骤可以保持纯 ASCII。
+        $labelTool = Join-Path $root 'tools\Set-NRReleaseAssetLabels.ps1'
+        (Test-Path -LiteralPath $labelTool) | Should -BeTrue
+        $labelText = Get-Content -LiteralPath $labelTool -Raw -Encoding UTF8
+        $labelText | Should -Match 'label'
+        $labelText | Should -Match '网络修复工具'
+
+        $release = Get-Content -LiteralPath (Join-Path $root '.github\workflows\release.yml') -Raw -Encoding UTF8
+        $release | Should -Match ([regex]::Escape('Set-NRReleaseAssetLabels.ps1'))
+    }
 }
