@@ -120,6 +120,10 @@ jobs:
           if (-not $gui.Success) { throw ('Graphical distribution build failed: {0}' -f $gui.ExecutableError) }
           if ($gui.DefaultMode -ne 'Gui') { throw ('Graphical build default mode is not Gui: {0}' -f $gui.DefaultMode) }
 
-          $process = Start-Process -FilePath $gui.Executable -ArgumentList '-Mode','GuiSmoke' -Wait -PassThru
+          $process = Start-Process -FilePath $gui.Executable -ArgumentList '-Mode','GuiSmoke' -PassThru
+          if (-not $process.WaitForExit(120000)) {
+            Stop-Process -Id $process.Id -Force
+            throw 'Graphical executable did not exit within 120s: a modal output dialog is likely blocking it.'
+          }
           if ($process.ExitCode -ne 0) { throw ('Graphical interface smoke test failed with exit code {0}.' -f $process.ExitCode) }
           Write-Host 'Graphical interface smoke test passed.'
