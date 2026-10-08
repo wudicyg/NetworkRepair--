@@ -38,7 +38,6 @@ function Show-NRBanner {
     Write-NRLine ' 安全原则：先诊断 → 先备份 → 再修改 → 最后验证' $c
     Write-NRLine ('=' * 68) $c
 }
-
 function Show-NRQuickStatus {
     try {
         $connections = @(Get-NRConnectionProfiles)
@@ -52,7 +51,7 @@ function Show-NRQuickStatus {
         })
 
         $numberedProfiles = @($suspects | Where-Object {
-            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+
+            $_.ProfileName -and [regex]::IsMatch(([string]$_.ProfileName).Trim(), '^(网络|Network) [0-9]+
     Write-NRLine ''
     Write-NRLine '当前可用操作：' 'White'
     Write-NRLine '  [1] 自动诊断' 'White'
@@ -125,7 +124,7 @@ try {
     if ($Json) { [pscustomobject]@{ Success = $false; Error = $_.Exception.Message; Log = $Script:LogFile } | ConvertTo-Json -Depth 4 }
     exit 1
 }
-
+)
         })
         $safeCandidates = @($numberedProfiles | Where-Object { $_.RemediationAllowed })
         $protectedNumbered = @($numberedProfiles | Where-Object { -not $_.RemediationAllowed })
@@ -151,7 +150,6 @@ try {
         Write-NRLine '（不影响后续完整诊断；实际操作前仍会重新检查。）' 'DarkGray'
     }
 }
-
 function Show-NRMenu {
     Write-NRLine ''
     Write-NRLine '当前可用操作：' 'White'
