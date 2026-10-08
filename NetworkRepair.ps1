@@ -59,13 +59,13 @@ function Invoke-NRMenu {
         Show-NRMenu
         $choice = Read-Host '请选择'
         switch ($choice) {
-            '1' { Invoke-NRScan | Out-Null; Pause-NR }
-            '2' { Invoke-NRRepair -Deep:$false -AssumeYes:$Yes | Out-Null; Pause-NR }
-            '3' { Invoke-NRRepair -Deep:$true -AssumeYes:$Yes | Out-Null; Pause-NR }
+            '1' { Invoke-NRScan -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
+            '2' { Invoke-NRRepair -Deep:$false -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
+            '3' { Invoke-NRRepair -Deep:$true -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
             '4' { $b = New-NRBackup; Write-NRLine ('备份完成：{0}' -f $b.Path) 'Green'; Pause-NR }
             '5' { $p = Read-Host '请输入备份目录或 .reg 文件路径'; if ($p) { Restore-NRBackup -BackupPath $p -AssumeYes:$Yes | Out-Null }; Pause-NR }
-            '6' { $r = Export-NRReport; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
-            '7' { Invoke-NRRepair -Deep:$false -DryRun -AssumeYes:$false | Out-Null; Pause-NR }
+            '6' { $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
+            '7' { Invoke-NRRepair -Deep:$false -DryRun -AssumeYes:$false -SkipConnectivityTest:$SkipConnectivityTest | Out-Null; Pause-NR }
             '8' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
             '0' { return 0 }
             default { Write-NRLine '无效选择。' 'Yellow'; Start-Sleep -Milliseconds 700 }
