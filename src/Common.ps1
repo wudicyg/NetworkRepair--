@@ -8,6 +8,13 @@ function Write-NRLog {
     param([Parameter(Mandatory)][string]$Message,[ValidateSet('INFO','WARN','ERROR')][string]$Level='INFO')
     Add-Content -LiteralPath $Script:LogFile -Value ('[{0}] [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'),$Level,$Message) -Encoding UTF8
 }
+function Write-NRSafeLog {
+    param([Parameter(Mandatory)][string]$Message,[ValidateSet('INFO','WARN','ERROR')][string]$Level='INFO')
+    # 没有日志文件上下文时（例如单元测试直接点源模块）静默跳过，避免日志写入失败打断主流程。
+    $logFile = [string](Get-Variable -Name 'LogFile' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
+    if ([string]::IsNullOrWhiteSpace($logFile)) { return }
+    Write-NRLog -Message $Message -Level $Level
+}
 function Write-NRLine { param([string]$Message,[string]$Color='Gray'); if ($NoColor) { Write-Host $Message } else { Write-Host $Message -ForegroundColor $Color } }
 function Write-NRSection { param([Parameter(Mandatory)][string]$Title); Write-NRLine ''; Write-NRLine ('--- {0} ---' -f $Title) 'Cyan'; Write-NRLog $Title }
 function Assert-NRAdministrator {
