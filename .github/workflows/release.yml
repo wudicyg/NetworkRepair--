@@ -25,7 +25,8 @@ jobs:
       - name: Verify tag matches application version
         run: |
           $content = Get-Content .\NetworkRepair.ps1 -Raw -Encoding UTF8
-          $match = [regex]::Match($content, "\$Script:AppVersion\s*=\s*'([^']+)'")
+          $pattern = '\$Script:AppVersion\s*=\s*''([^'']+)''' 
+          $match = [regex]::Match($content, $pattern)
           if (-not $match.Success) { throw 'Unable to determine application version.' }
           $version = $match.Groups[1].Value
           $tagVersion = $env:GITHUB_REF_NAME.Substring(1)
