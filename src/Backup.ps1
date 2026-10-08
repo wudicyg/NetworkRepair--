@@ -133,6 +133,7 @@ function Invoke-NRRestoreSafetyRollback {
         [pscustomobject]@{Name='NewNetworks';RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\NewNetworks'}
     )
     $results=@()
+    $serviceRefresh=$null
     try {
         Write-NRLog ('Restoring pre-restore safety backup: {0}'-f $SafetyBackup.Path) 'WARN'
         foreach($scope in $scopeMap){
@@ -141,7 +142,7 @@ function Invoke-NRRestoreSafetyRollback {
             & reg.exe import $file|Out-Null
             if($LASTEXITCODE -ne 0){throw ('安全备份导入失败，scope={0}，reg.exe exit code={1}'-f $scope.Name,$LASTEXITCODE)}
         }
-        Restart-NRNetworkServices
+        $serviceRefresh=Invoke-NRServiceRefresh -Scope 'NetworkList'
         foreach($scope in $scopeMap){
             $file=if($scope.Name -eq 'Profiles'){$SafetyBackup.ProfilesBackup}else{$SafetyBackup.NewNetworksBackup}
             if(-not $file -or -not(Test-Path -LiteralPath $file)){continue}
@@ -149,9 +150,9 @@ function Invoke-NRRestoreSafetyRollback {
             $results += [pscustomobject]@{Scope=$scope.Name;Verification=$verification}
             if(-not $verification.Success -or -not $verification.Match){throw ('安全备份回滚后的 {0} 快照与安全备份不一致。'-f $scope.Name)}
         }
-        [pscustomobject]@{Success=$true;Verified=$true;Error=$null;Verification=@($results);SafetyBackup=$SafetyBackup.Path}
+        [pscustomobject]@{Success=$true;Verified=$true;Error=$null;Verification=@($results);SafetyBackup=$SafetyBackup.Path;ServiceRefresh=$serviceRefresh}
     } catch {
-        [pscustomobject]@{Success=$false;Verified=$false;Error=$_.Exception.Message;Verification=@($results);SafetyBackup=$SafetyBackup.Path}
+        [pscustomobject]@{Success=$false;Verified=$false;Error=$_.Exception.Message;Verification=@($results);SafetyBackup=$SafetyBackup.Path;ServiceRefresh=$serviceRefresh}
     }
 }
 
@@ -176,7 +177,7 @@ function Restore-NRBackup {
             & reg.exe import $newNetworksReg|Out-Null
             if($LASTEXITCODE -ne 0){throw ('NewNetworks restore failed, reg.exe exit code={0}'-f $LASTEXITCODE)}
         }
-        Restart-NRNetworkServices
+        $serviceRefresh=Invoke-NRServiceRefresh -Scope 'NetworkList'
         $scopeMap=@(
             [pscustomobject]@{Name='Profiles';File=$profilesReg;RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'}
             [pscustomobject]@{Name='NewNetworks';File=$newNetworksReg;RegistryPath='HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\NewNetworks'}
@@ -190,7 +191,7 @@ function Restore-NRBackup {
         }
         $validation=Get-NRDiagnostics -SkipConnectivityTest
         Write-NRLog 'Restore completed, scoped snapshots verified, and state re-read.'
-        return [pscustomobject]@{Success=$true;Path=$reg;SafetyBackup=$preRestore.Path;ScopeVerification=@($verificationResults);Validation=$validation}
+        return [pscustomobject]@{Success=$true;Path=$reg;SafetyBackup=$preRestore.Path;ScopeVerification=@($verificationResults);Validation=$validation;ServiceRefresh=$serviceRefresh}
     } catch {
         $errorMessage=$_.Exception.Message
         Write-NRLog ('Restore failed: {0}'-f $errorMessage) 'ERROR'
