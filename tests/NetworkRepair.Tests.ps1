@@ -9,6 +9,7 @@
         . (Join-Path $root 'src\Diagnostics.ps1')
         . (Join-Path $root 'src\Backup.ps1')
         . (Join-Path $root 'src\RestorePoints.ps1')
+        . (Join-Path $root 'src\Services.ps1')
 
         function New-TestRestorePoint {
             param(
@@ -629,5 +630,150 @@
 
         $repair=Get-Content -LiteralPath (Join-Path $root 'src\Repair.ps1') -Raw -Encoding UTF8
         $repair | Should -Match ([regex]::Escape("New-NRBackup -Level 'PreRepair'"))
+    }
+
+    It 'plans the service refresh in dependency order' {
+        $plan=Get-NRServiceRefreshPlan -Scope 'NetworkList'
+        $plan.Required | Should -BeTrue
+        @($plan.StopOrder) | Should -Be @('netprofm','NlaSvc')
+        @($plan.StartOrder) | Should -Be @('NlaSvc','netprofm')
+
+        $skip=Get-NRServiceRefreshPlan -Scope 'Skip'
+        $skip.Required | Should -BeFalse
+        @($skip.StopOrder).Count | Should -Be 0
+        @($skip.StartOrder).Count | Should -Be 0
+    }
+
+    It 'touches no service at all when the refresh scope is skipped' {
+        Mock -CommandName Get-Service -MockWith { throw 'service lookup must not happen for a skipped refresh' }
+        $r=Invoke-NRServiceRefresh -Scope 'Skip'
+        $r.Required | Should -BeFalse
+        $r.Success | Should -BeTrue
+        $r.Degraded | Should -BeFalse
+        @($r.Refreshed).Count | Should -Be 0
+        Should -Invoke -CommandName Get-Service -Times 0 -Exactly
+    }
+
+    It 'waits for a bounded time for the expected service status' {
+        $script:probe=0
+        Mock -CommandName Get-Service -MockWith {
+            $script:probe++
+            if ($script:probe -ge 3) { [pscustomobject]@{ Status = 'Running' } } else { [pscustomobject]@{ Status = 'StartPending' } }
+        }
+        (Wait-NRServiceStatus -Name 'NlaSvc' -Status 'Running' -TimeoutSeconds 5 -IntervalMilliseconds 100) | Should -BeTrue
+        $script:probe | Should -BeGreaterOrEqual 3
+
+        Mock -CommandName Get-Service -MockWith { [pscustomobject]@{ Status = 'Stopped' } }
+        (Wait-NRServiceStatus -Name 'NlaSvc' -Status 'Running' -TimeoutSeconds 1 -IntervalMilliseconds 100) | Should -BeFalse
+    }
+
+    It 'refreshes services in dependency order and reports readiness' {
+        Mock -CommandName Get-Service -MockWith {
+            if ($DependentServices) { return @() }
+            [pscustomobject]@{ Name = $Name; Status = 'Running' }
+        }
+        Mock -CommandName Stop-Service -MockWith { }
+        Mock -CommandName Start-Service -MockWith { }
+        Mock -CommandName Wait-NRServiceStatus -MockWith { $true }
+        Mock -CommandName Wait-NRNetworkListManagerReady -MockWith { [pscustomobject]@{ Ready = $true; Attempts = 1; Error = $null } }
+
+        $r=Invoke-NRServiceRefresh -Scope 'NetworkList'
+        $r.Success | Should -BeTrue
+        $r.Degraded | Should -BeFalse
+        $r.ComReady | Should -BeTrue
+        @($r.Refreshed) | Should -Contain 'NlaSvc'
+        @($r.Refreshed) | Should -Contain 'netprofm'
+        @($r.Failed).Count | Should -Be 0
+        Should -Invoke -CommandName Stop-Service -Times 2 -Exactly
+        Should -Invoke -CommandName Start-Service -Times 2 -Exactly
+    }
+
+    It 'reports a failed service start instead of swallowing it' {
+        Mock -CommandName Get-Service -MockWith {
+            if ($DependentServices) { return @() }
+            [pscustomobject]@{ Name = $Name; Status = 'Running' }
+        }
+        Mock -CommandName Stop-Service -MockWith { }
+        Mock -CommandName Start-Service -MockWith { throw 'start failed' }
+        Mock -CommandName Wait-NRServiceStatus -MockWith { $Status -eq 'Stopped' }
+        Mock -CommandName Wait-NRNetworkListManagerReady -MockWith { [pscustomobject]@{ Ready = $false; Attempts = 3; Error = 'COM 不可用' } }
+
+        $r=Invoke-NRServiceRefresh -Scope 'NetworkList' -StartAttempts 1 -ServiceTimeoutSeconds 1
+        $r.Success | Should -BeFalse
+        $r.Degraded | Should -BeTrue
+        $r.ComReady | Should -BeFalse
+        @($r.Failed).Count | Should -Be 2
+        @($r.Failed | Where-Object { $_.Phase -eq 'Start' }).Count | Should -Be 2
+        Should -Invoke -CommandName Start-Service -Times 2 -Exactly
+    }
+
+    It 'never starts a service that was not already running' {
+        Mock -CommandName Get-Service -MockWith {
+            if ($DependentServices) { return @() }
+            [pscustomobject]@{ Name = $Name; Status = 'Stopped' }
+        }
+        Mock -CommandName Stop-Service -MockWith { }
+        Mock -CommandName Start-Service -MockWith { }
+        Mock -CommandName Wait-NRServiceStatus -MockWith { $true }
+        Mock -CommandName Wait-NRNetworkListManagerReady -MockWith { [pscustomobject]@{ Ready = $true; Attempts = 1; Error = $null } }
+
+        $r=Invoke-NRServiceRefresh -Scope 'NetworkList'
+        @($r.NotRunning).Count | Should -Be 2
+        @($r.Refreshed).Count | Should -Be 0
+        $r.Success | Should -BeTrue
+        Should -Invoke -CommandName Start-Service -Times 0 -Exactly
+    }
+
+    It 'records dependent services pulled down by a forced stop' {
+        Mock -CommandName Get-Service -MockWith {
+            if ($DependentServices) { return @([pscustomobject]@{ Name = 'NlmSvcExtra'; Status = 'Running' }) }
+            [pscustomobject]@{ Name = $Name; Status = 'Running' }
+        }
+        Mock -CommandName Stop-Service -MockWith { }
+        Mock -CommandName Start-Service -MockWith { }
+        Mock -CommandName Wait-NRServiceStatus -MockWith { $true }
+        Mock -CommandName Wait-NRNetworkListManagerReady -MockWith { [pscustomobject]@{ Ready = $true; Attempts = 1; Error = $null } }
+
+        $r=Invoke-NRServiceRefresh -Scope 'NetworkList'
+        @($r.Collateral).Count | Should -Be 1
+        @($r.Refreshed) | Should -Contain 'NlmSvcExtra'
+        @($r.Failed).Count | Should -Be 0
+        Should -Invoke -CommandName Start-Service -Times 3 -Exactly
+    }
+
+    It 'wires the scoped service refresh strategy into every modification path' {
+        $entry=Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match ([regex]::Escape('Services.ps1'))
+
+        $services=Get-Content -LiteralPath (Join-Path $root 'src\Services.ps1') -Raw -Encoding UTF8
+        $services | Should -Match 'function Invoke-NRServiceRefresh'
+        $services | Should -Match 'function Wait-NRServiceStatus'
+        $services | Should -Match 'function Wait-NRNetworkListManagerReady'
+        # 只对非注释代码行断言：注释里会提到被替换掉的旧实现。
+        $serviceCode = (@($services -split "`r?`n") | Where-Object { $_.TrimStart() -notmatch '^#' }) -join "`n"
+        $serviceCode | Should -Not -Match 'Restart-Service'
+        $serviceCode | Should -Not -Match ([regex]::Escape('Start-Sleep -Seconds 2'))
+        $serviceCode | Should -Match 'Stop-Service'
+        $serviceCode | Should -Match 'Start-Service'
+
+        $repair=Get-Content -LiteralPath (Join-Path $root 'src\Repair.ps1') -Raw -Encoding UTF8
+        $repair | Should -Not -Match 'function Restart-NRNetworkServices'
+        $repair | Should -Match 'Invoke-NRServiceRefresh -Scope \$refreshScope'
+        $repair | Should -Match ([regex]::Escape("if (`$changed -gt 0 -or `$newNetworksCleared) { `$refreshScope = 'NetworkList' }"))
+        $repair | Should -Match 'ServiceRefresh=\$serviceRefresh'
+
+        $backup=Get-Content -LiteralPath (Join-Path $root 'src\Backup.ps1') -Raw -Encoding UTF8
+        $backup | Should -Not -Match 'Restart-NRNetworkServices'
+        ([regex]::Matches($backup,"Invoke-NRServiceRefresh -Scope 'NetworkList'")).Count | Should -Be 2
+        $backup | Should -Match 'ServiceRefresh=\$serviceRefresh'
+
+        $identity=Get-Content -LiteralPath (Join-Path $root 'src\NetworkIdentity.ps1') -Raw -Encoding UTF8
+        $identity | Should -Not -Match 'Restart-NRNetworkServices'
+        $identity | Should -Match "Invoke-NRServiceRefresh -Scope 'NetworkList'"
+        $identity | Should -Match ([regex]::Escape("New-NRBackup -Level 'PreRepair'"))
+        $identity | Should -Match 'ServiceRefresh=\$serviceRefresh'
+
+        $common=Get-Content -LiteralPath (Join-Path $root 'src\Common.ps1') -Raw -Encoding UTF8
+        $common | Should -Match 'function Write-NRSafeLog'
     }
 }
