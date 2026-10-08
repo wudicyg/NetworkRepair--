@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0-dev]
+
+### Added
+- 独立修复决策计划层，统一 Dry Run 与真实修复路径。
+- Deep Repair 在无可删除 Profile 时仍可明确执行 `NewNetworks` 刷新。
+- 增加 v0.4 修复计划回归测试。
+
+
 ## [0.3.0-dev]
 
 ### Added
