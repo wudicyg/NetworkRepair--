@@ -27,7 +27,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation
 | 正常 Internet，但编号 Profile 为当前活动连接 | 不允许自动删除 |
 | 正常 Internet，但编号 Profile 为 Managed | 不允许自动删除 |
 | Windows 10 + PowerShell 5.1 | 读取与 Safe Repair 回归通过 |
-| Windows 11 + PowerShell 5.1 | 后续扩展验证，不阻塞 0.4.0 |
+| Windows 11 + PowerShell 5.1 | 后续扩展验证，不阻塞 1.0.0 |
 | DHCP IPv4 | 修复前后 IPv4、默认网关、DNS 正常 |
 | 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
 | Deep Repair | 只验证 `NewNetworks` 范围，不触碰 Signatures 无差别清理 |
