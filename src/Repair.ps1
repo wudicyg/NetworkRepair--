@@ -10,12 +10,19 @@ function Invoke-NRRepair {
     param([switch]$Deep,[switch]$DryRun,[switch]$AssumeYes,[switch]$SkipConnectivityTest)
 
     $d = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
-    $plan = Get-NRRepairPlan -Candidates $d.Candidates -Deep:$Deep
+    $decision = Get-NRRepairDecision -Diagnostics $d -Deep:$Deep
+    $plan = $decision.Plan
 
     if (-not $Json) { Show-NRDiagnostics -Diagnostics $d }
 
     if ($plan.IsNoOp) {
-        Write-NRLine '没有需要执行的修复操作。' 'Green'
+        if ($decision.Recommendation -eq 'NoAction') {
+            Write-NRLine '网络状态正常，且没有发现可安全清理的历史编号 Profile，无需修复。' 'Green'
+        } elseif ($decision.Recommendation -eq 'InvestigateNetwork') {
+            Write-NRLine '当前存在网络健康问题，但没有发现可自动清理的 Profile；建议先调查网络故障。' 'Yellow'
+        } else {
+            Write-NRLine '没有需要执行的修复操作。' 'Green'
+        }
         Write-NRLog 'Repair plan is a no-op.'
         return [pscustomobject]@{
             Success=$true
@@ -26,6 +33,7 @@ function Invoke-NRRepair {
             Deep=[bool]$Deep
             DryRun=[bool]$DryRun
             Plan=$plan
+            Decision=$decision
         }
     }
 
@@ -54,6 +62,7 @@ function Invoke-NRRepair {
             Deep=[bool]$Deep
             DryRun=$true
             Plan=$plan
+            Decision=$decision
         }
     }
 
@@ -66,6 +75,7 @@ function Invoke-NRRepair {
             Candidates=@($plan.SafeCandidates | Select-Object KeyName,ProfileName,RiskScore,RiskLevel,Reason,DiagnosticCodes,LastWrite)
             Backup=$null
             Plan=$plan
+            Decision=$decision
         }
     }
 
@@ -90,6 +100,7 @@ function Invoke-NRRepair {
             Deep=[bool]$Deep
             DryRun=$false
             Plan=$plan
+            Decision=$decision
         }
     }
     catch {
@@ -102,6 +113,7 @@ function Invoke-NRRepair {
             Backup=$backup
             Rollback=$restore
             Plan=$plan
+            Decision=$decision
         }
     }
 }
