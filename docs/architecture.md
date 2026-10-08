@@ -53,6 +53,16 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 - **保留策略**：每个等级保留最近 `KeepPerLevel`（默认 10）个；安全点至少保留 `KeepSafetyPerLevel`（默认 3）个；`Pinned` 恢复点永不参与清理。
 - **清理边界**：清理只在显式确认后执行，并且只允许删除备份根目录的直接子目录，其余路径一律跳过并报告，防止 manifest 被篡改后越权删除。
 
+## Service refresh
+
+`NetworkList` 范围（`Profiles` / `NewNetworks`）发生真实改动后，`src/Services.ps1` 负责刷新 NlaSvc 与 netprofm：
+
+- **按需刷新**：没有实际注册表改动时（例如健康网络的 NoAction 修复）跳过刷新，不再无条件重启网络服务。
+- **依赖顺序**：netprofm 依赖 NlaSvc，停止顺序为 netprofm → NlaSvc，启动顺序相反；被 `-Force` 连带停止的清单外依赖服务会被记录，并在随后一并拉起。
+- **有界验证**：不再使用固定 `Start-Sleep 2`，改为在超时上限内轮询服务状态，并以 Network List Manager COM 是否恢复可用作为就绪判据。
+- **不扩大修改范围**：原本未运行或未安装的服务不会被主动启动，只如实记录。
+- **结果回传**：刷新返回结构化结果（`Refreshed` / `NotRunning` / `Missing` / `Failed` / `Collateral` / `ComReady` / `Degraded`），修复、恢复与重命名都会把它带进各自的返回对象，降级时给出可见提示。
+
 ## Diagnostic layers
 
 - Connection Profile
