@@ -24,11 +24,11 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 ## 当前能力
 
 - 自动检查 Windows 版本、网络适配器和当前 Connection Profile
-- 扫描 `NetworkList\Profiles` 并识别低风险/高风险候选
+- 扫描 `NetworkList\\Profiles` 并识别低风险/高风险候选
 - 中文与英文的编号网络名称识别，例如 `网络 3` / `Network 3`
 - 默认不会删除当前活动 Profile
-- 默认不会清理 `Signatures\Managed` / `Signatures\Unmanaged`
-- 修复前自动创建带时间戳的完整 `NetworkList.reg` 备份
+- 默认不会清理 `Signatures\\Managed` / `Signatures\\Unmanaged`
+- 修复前自动创建带时间戳的完整 `NetworkList.reg` 备份，同时保存 Restore 所需的 scoped `Profiles` / `NewNetworks` 快照
 - Dry Run：只显示操作计划，不修改系统
 - 修复后重新扫描并进行连通性验证
 - 验证失败自动尝试回滚
@@ -44,7 +44,7 @@ NetworkRepair 的核心任务不是“重置整个网络”，而是解决 Windo
 - 基于 Network List Manager 的显式网络重命名
 - 独立 Repair Planner：统一 Dry Run 与真实修复的操作计划
 - Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
-- Restore 导入后进行 `NetworkList.reg` 快照校验，失败自动回到恢复前安全备份
+- Restore 只导入 NetworkRepair 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
 - 交互式菜单进入时提供只读快速状态概览，不触发 NCSI 主动探测；Repair / Dry Run 前仍执行完整重新诊断
 
@@ -77,13 +77,13 @@ NetworkRepair.bat -Mode Scan -Json
 导出脱敏诊断包（只读，不包含机器名、MAC、IP、NetworkId 或注册表备份）：
 
 ```bat
-powershell.exe -ExecutionPolicy Bypass -File .\tools\Export-NRSanitizedDiagnosticBundle.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\\tools\\Export-NRSanitizedDiagnosticBundle.ps1
 ```
 
 构建发布包（开发者/维护者）：
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\tools\New-NRReleasePackage.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\\tools\\New-NRReleasePackage.ps1
 ```
 
 发布包由带 `v` 前缀的版本 Tag 触发 GitHub Actions 自动构建，并生成 ZIP 与 SHA-256 校验文件。发布 Tag 必须与 `NetworkRepair.ps1` 中的版本完全一致。
@@ -138,24 +138,35 @@ Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 P
 
 ### Deep Repair
 
-在 Safe Repair 基础上刷新 `NewNetworks`。当前开发版 **不会**无条件删除 `Signatures\Managed` / `Signatures\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
+在 Safe Repair 基础上刷新 `NewNetworks`。当前开发版 **不会**无条件删除 `Signatures\\Managed` / `Signatures\\Unmanaged`，因为这些签名数据可能参与网络识别，尤其在企业环境中不适合默认破坏。
 
 ## 备份
 
-每次真正修改前创建：
+每次真正修改前创建一个带时间戳的目录，例如：
 
 ```text
 backups/
-  20261008_013521_123/
+  20261008_190429_297/
     NetworkList.reg
+    NetworkList-Profiles.reg
+    NetworkList-NewNetworks.reg
     diagnostic.json
     manifest.json
 ```
 
+其中：
+
+- `NetworkList.reg`：完整 `NetworkList` 树的只读基线快照，用于审计与故障排查。
+- `NetworkList-Profiles.reg`：Restore 实际导入和校验的 `Profiles` 范围。
+- `NetworkList-NewNetworks.reg`：存在该键时，Restore 实际导入和校验的 `NewNetworks` 范围。
+- `diagnostic.json` / `manifest.json`：保存诊断与备份元数据。
+
+Restore 不再直接导入完整的 `NetworkList.reg`，以避免把 NetworkRepair 未管理的 Registry 子树一并覆盖。恢复失败时，工具会自动使用 Restore 前刚创建的安全备份，仅回滚上述 managed scopes。
+
 可以恢复：
 
 ```bat
-NetworkRepair.bat -Mode Restore -BackupPath "backups\20261008_013521_123" -Yes
+NetworkRepair.bat -Mode Restore -BackupPath "backups\\20261008_190429_297" -Yes
 ```
 
 ## 日志
@@ -217,7 +228,7 @@ NetworkRepair 使用 Windows `NetConnection` 模块获取 Connection Profile，�
 
 ## 项目路线
 
-当前 `main` 已包含 v0.4 的 Repair Planner、Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。正式稳定版仍需完成 Windows 10 / 11 多版本实机矩阵、更多语言环境与最终发布验收。
+当前 `main` 已包含 v0.4 的 Repair Planner、scoped Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。正式稳定版仍需完成 Windows 10 / 11 多版本实机矩阵、更多语言环境与最终发布验收。
 
 ## License
 
