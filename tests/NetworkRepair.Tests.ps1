@@ -40,7 +40,7 @@
         $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
         $content | Should -Match 'entryVersionMatch'
         $content | Should -Match ([regex]::Escape("Groups[1].Value"))
-        $content | Should -Not -Match ([regex]::Escape("$Script:AppVersion = '0.4.0-dev'"))
+        $content | Should -Not -Match ([regex]::Escape('$Script:AppVersion = ''0.4.0-dev'''))
     }
 
     It 'keeps diagnostic degradation warnings visible in the human-readable report' {
