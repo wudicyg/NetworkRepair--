@@ -1,0 +1,118 @@
+﻿# Windows 10 / 11 Release Validation
+
+NetworkRepair 的 CI 只能证明脚本语法和单元测试通过；正式发布前仍需要真实 Windows 10 / 11 行为验证。
+
+## 只读证据采集
+
+在待测机器上运行：
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation.ps1 -OutputPath .\validation\machine.json
+```
+
+跳过 Internet/NCSI 主动探测：
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation.ps1 -SkipConnectivityTest -OutputPath .\validation\machine.json
+```
+
+该工具只读取系统状态，不执行 Repair、Deep Repair、Rename、Restore、服务重启或注册表写入。输出会省略 MAC 地址等与验收无关的信息。
+
+## 核心验证矩阵
+
+| 场景 | 期望 |
+| --- | --- |
+| 正常 Internet，且无编号历史 Profile | `NetworkHealth=Healthy`，`RepairRecommendation=NoAction`，不进入修改路径 |
+| 正常 Internet，存在非活动 `网络 2/3/4` 或 `Network 2/3/4` | `NetworkHealth=Healthy`，仍识别为历史 Profile，并生成清理计划 |
+| 正常 Internet，但编号 Profile 为当前活动连接 | 不允许自动删除 |
+| 正常 Internet，但编号 Profile 为 Managed | 不允许自动删除 |
+| Windows 10 + PowerShell 5.1 | 读取、Dry Run、Safe Repair 回归通过 |
+| Windows 11 + PowerShell 5.1 | NetworkId ↔ Profile GUID 精确关联通过 |
+| DHCP IPv4 | 修复前后 IPv4、默认网关、DNS 正常 |
+| 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
+| Deep Repair | 只验证 `NewNetworks` 范围，不触碰 Signatures 无差别清理 |
+| Rename | 显式 NetworkId 修改后名称与原意一致，失败可回滚 |
+| Restore | 恢复后快照匹配；失败时回到恢复前安全备份 |
+| 中文/英文系统 | 分别验证 `网络 N` / `Network N` |
+
+## 推荐测试顺序
+
+### 1. 基线
+
+先运行只读证据采集器，保存 `machine.json`。
+
+记录 Windows Build、PowerShell、网卡介质、当前连接、NetworkHealth、编号 Profile 数量。
+
+### 2. 健康网络无历史 Profile
+
+验证结果必须是：
+
+```text
+NetworkHealth = Healthy
+ProfileHygieneStatus = Clean
+RepairRecommendation = NoAction
+```
+
+随后运行：
+
+```powershell
+.\NetworkRepair.bat -Mode Repair
+```
+
+观察脚本只能诊断并显示“无需修复”，不得创建修改前备份，不得删除注册表。
+
+### 3. 健康网络 + 历史编号 Profile
+
+在可回滚的测试环境中准备至少：
+
+```text
+网络 2
+网络 3
+Network 4
+```
+
+并确保这些 Profile 不是当前活动连接、不是 Managed。
+
+先执行：
+
+```powershell
+.\NetworkRepair.bat -Mode DryRun
+```
+
+期望：
+
+```text
+NetworkHealth = Healthy
+ProfileHygieneStatus = HistoricalProfilesFound
+RepairRecommendation = CleanHistoricalProfiles
+```
+
+并看到 3 个 `DeleteProfile` 动作。
+
+确认计划正确后，再执行 Safe Repair。
+
+### 4. 保护性回归
+
+将其中一个编号 Profile 设为当前活动连接，或让它成为 Managed Profile。
+
+重复 Dry Run。
+
+期望该对象进入：
+
+```text
+ProtectedNumberedProfilesPresent
+```
+
+且 `DeleteProfileCount` 不包含受保护对象。
+
+## 证据留存
+
+每台机器至少保留：
+
+- `machine.json`
+- Dry Run 输出
+- Safe Repair 前后诊断结果
+- 如执行 Restore/Rename，再保存对应日志与结果
+- Windows 版本、PowerShell、网卡介质、测试日期
+
+不要把 Wi-Fi 密码、VPN 凭据或其他秘密数据上传到 Issue。
