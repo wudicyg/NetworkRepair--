@@ -1,5 +1,13 @@
 ﻿# Changelog
 
+## [1.0.0] - 2026-10-08
+
+### Release
+- NetworkRepair 1.0.0 首个正式稳定版。
+- 核心历史编号 Profile（网络 N / Network N）安全清理路径、scoped Backup/Restore、诊断、验证和自动回滚能力完成收口。
+- 正式版移除开发/验收用途的独立 Dry Run 功能，交互式菜单收口为 7 项主要操作。
+- Windows 10 / PowerShell 5.1 核心实机行为验证完成；Windows 11 与更多环境作为后续兼容性验证。
+
 ## [0.4.0] - 2026-10-08
 
 ### Release
