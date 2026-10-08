@@ -971,6 +971,8 @@
         $tool = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -Raw -Encoding UTF8
         $tool | Should -Match ([regex]::Escape("[string]`$DefaultMode = 'Gui'"))
         $tool | Should -Match 'NoConsole'
+        # ps2exe 在无控制台模式下会把脚本输出变成模态对话框并阻塞进程，图形版必须同时加 -noOutput。
+        $tool | Should -Match 'NoOutput'
         # 备用启动器必须显式回到控制台 TUI，否则控制台入口会消失。
         $tool | Should -Match ([regex]::Escape('-Mode Menu'))
     }
