@@ -35,6 +35,14 @@
         $content | Should -Match '快速状态：网络='
         $content | Should -Match '跳过 NCSI 主动探测'
     }
+    It 'keeps read-only validation evidence version synchronized with the entry script' {
+        $toolPath = Join-Path $root 'tools\Invoke-NRReadOnlyValidation.ps1'
+        $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
+        $content | Should -Match 'entryVersionMatch'
+        $content | Should -Match ([regex]::Escape("Groups[1].Value"))
+        $content | Should -Not -Match ([regex]::Escape('$Script:AppVersion = ''0.4.0-dev'''))
+    }
+
     It 'keeps diagnostic degradation warnings visible in the human-readable report' {
         $entryPath = Join-Path $root 'src\Diagnostics.ps1'
         $content = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
