@@ -1,4 +1,4 @@
-﻿Describe 'NetworkRepair test suite' {
+﻿Describe 'NetMedic test suite' {
     BeforeAll {
         $root = Split-Path -Parent $PSScriptRoot
         . (Join-Path $root 'src\Common.ps1')
@@ -16,7 +16,7 @@
         function New-TestReleaseFeed {
             param([Parameter(Mandatory)][string[]]$Tags)
             $entries = foreach ($tag in $Tags) {
-                '<entry><title>NetworkRepair {0}</title><link rel="alternate" type="text/html" href="https://github.com/wudicyg/NetworkRepair--/releases/tag/{0}"/><updated>2026-01-01T00:00:00Z</updated></entry>' -f $tag
+                '<entry><title>NetMedic {0}</title><link rel="alternate" type="text/html" href="https://github.com/wudicyg/netmedic/releases/tag/{0}"/><updated>2026-01-01T00:00:00Z</updated></entry>' -f $tag
             }
             [pscustomobject]@{
                 StatusCode = 200
@@ -44,10 +44,10 @@
             if ($ManifestContent) {
                 $ManifestContent | Set-Content -LiteralPath $manifestPath -Encoding UTF8
             } elseif ($Level) {
-                [pscustomobject]@{ App='NetworkRepair'; Version='1.0.0'; Level=$Level; Pinned=[bool]$Pinned; Timestamp=$Timestamp } |
+                [pscustomobject]@{ App='NetMedic'; Version='1.0.0'; Level=$Level; Pinned=[bool]$Pinned; Timestamp=$Timestamp } |
                     ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding UTF8
             } else {
-                [pscustomobject]@{ App='NetworkRepair'; Version='0.4.0'; Timestamp=$Timestamp } |
+                [pscustomobject]@{ App='NetMedic'; Version='0.4.0'; Timestamp=$Timestamp } |
                     ConvertTo-Json | Set-Content -LiteralPath $manifestPath -Encoding UTF8
             }
             $path
@@ -244,7 +244,7 @@
     }
 
     It 'resolves scoped restore files from a backup directory or NetworkList.reg path' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_scope_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_scope_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             $full=Join-Path $dir 'NetworkList.reg'
@@ -261,7 +261,7 @@
     }
 
     It 'rejects legacy full-tree backups that lack scoped restore files' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_legacy_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_legacy_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             @('full') | Set-Content -LiteralPath (Join-Path $dir 'NetworkList.reg') -Encoding UTF8
@@ -271,7 +271,7 @@
     }
 
     It 'treats NewNetworks as optional when the scoped backup file is absent' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_optional_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_optional_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             @('full') | Set-Content -LiteralPath (Join-Path $dir 'NetworkList.reg') -Encoding UTF8
@@ -282,7 +282,7 @@
     }
 
     It 'compares registry snapshots canonically across ordering and registry-name casing' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_test_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_test_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             $a=Join-Path $dir 'a.reg';$b=Join-Path $dir 'b.reg'
@@ -295,12 +295,12 @@
     }
 
     It 'detects registry snapshot data differences' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_test_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_test_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             $a=Join-Path $dir 'a.reg';$b=Join-Path $dir 'b.reg'
-            @('[HKEY_LOCAL_MACHINE\SOFTWARE\NetworkRepair]','"Name"="Office"') | Set-Content -LiteralPath $a -Encoding UTF8
-            @('[HKEY_LOCAL_MACHINE\SOFTWARE\NetworkRepair]','"Name"="Home"') | Set-Content -LiteralPath $b -Encoding UTF8
+            @('[HKEY_LOCAL_MACHINE\SOFTWARE\NetMedic]','"Name"="Office"') | Set-Content -LiteralPath $a -Encoding UTF8
+            @('[HKEY_LOCAL_MACHINE\SOFTWARE\NetMedic]','"Name"="Home"') | Set-Content -LiteralPath $b -Encoding UTF8
             $r=Compare-NRRegSnapshotFiles -ExpectedPath $a -ActualPath $b
             $r.Match | Should -BeFalse
             $r.Differences.Count | Should -BeGreaterThan 0
@@ -436,7 +436,7 @@
     }
 
     It 'lists restore points newest first with levels and integrity state' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rp_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rp_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -Level 'Manual')
@@ -455,7 +455,7 @@
     }
 
     It 'treats restore points without level metadata as legacy manual points' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rplevel_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rplevel_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -Level '')
@@ -472,7 +472,7 @@
     }
 
     It 'marks restore points with missing scoped files as incomplete and refuses to select them' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpbad_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpbad_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -SkipScopedFiles)
@@ -486,7 +486,7 @@
     }
 
     It 'does not throw when a restore point manifest is unreadable' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpjson_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpjson_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00' -Level 'Manual' -ManifestContent '{ this is not json')
@@ -499,7 +499,7 @@
     }
 
     It 'rejects an out-of-range restore point index' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpidx_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpidx_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00')
@@ -510,7 +510,7 @@
     }
 
     It 'keeps the newest restore points per level and never removes pinned points' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpplan_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpplan_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             $day=1
@@ -537,7 +537,7 @@
     }
 
     It 'pins a restore point so it survives retention, and unpins it again' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rppin_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rppin_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00')
@@ -557,7 +557,7 @@
     }
 
     It 'prunes only the planned restore points and verifies the remaining set' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpprune_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpprune_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             foreach ($day in 1..3) {
@@ -577,7 +577,7 @@
     }
 
     It 'refuses to delete restore point paths outside the backup root' {
-        $outer=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpouter_{0}'-f [guid]::NewGuid().ToString('N'))
+        $outer=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpouter_{0}'-f [guid]::NewGuid().ToString('N'))
         $backupRoot=Join-Path $outer 'backups'
         $victim=Join-Path $outer 'keep-me'
         New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
@@ -593,7 +593,7 @@
     }
 
     It 'does not delete anything when the retention plan has no candidates' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpnoop_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpnoop_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             [void](New-TestRestorePoint -Root $dir -Name '20260101_010101_001' -Timestamp '2026-01-01T01:01:01.0000000+08:00')
@@ -608,7 +608,7 @@
     }
 
     It 'reports prune candidates in the restore point summary' {
-        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_rpsum_{0}'-f [guid]::NewGuid().ToString('N'))
+        $dir=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_rpsum_{0}'-f [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             foreach ($day in 1..3) {
@@ -806,7 +806,7 @@
     }
 
     It 'flattens every module into one runnable single-file script' {
-        $out=Join-Path ([IO.Path]::GetTempPath()) ('NetworkRepair_dist_{0}'-f [guid]::NewGuid().ToString('N'))
+        $out=Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_dist_{0}'-f [guid]::NewGuid().ToString('N'))
         try {
             $result = & (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -OutputDirectory $out -SkipExecutable | ConvertFrom-Json
             $result.Success | Should -BeTrue
@@ -826,14 +826,14 @@
 
             # 单文件脚本必须真的能跑起来，而不只是「看起来压平了」。
             $output = (& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File $result.SingleScript -Mode Version) -join ' '
-            $output | Should -Match 'NetworkRepair v'
+            $output | Should -Match 'NetMedic v'
         } finally {Remove-Item -LiteralPath $out -Recurse -Force -ErrorAction SilentlyContinue}
     }
 
     It 'packages one obvious Chinese-named entry for regular users' {
         $packager = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRReleasePackage.ps1') -Raw -Encoding UTF8
         $packager | Should -Match ([regex]::Escape("'使用说明.md'"))
-        $packager | Should -Match '网络修复工具'
+        $packager | Should -Match '网络医生'
         # 中文文件名必须用 UTF-8 条目名写入 zip，否则解压后是乱码。
         $packager | Should -Match 'CreateFromDirectory'
         $packager | Should -Match 'UTF8'
@@ -841,7 +841,7 @@
         $packager | Should -Not -Match ([regex]::Escape("'NetworkRepair.bat'"))
 
         $quickStart = Get-Content -LiteralPath (Join-Path $root '使用说明.md') -Raw -Encoding UTF8
-        $quickStart | Should -Match '网络修复工具\.exe'
+        $quickStart | Should -Match '网络医生\.exe'
         $quickStart | Should -Match '备用启动'
     }
 
@@ -886,9 +886,9 @@
     }
 
     It 'keeps release asset names ASCII because GitHub strips other characters' {
-        # 实测：上传「网络修复工具_1.0.0.exe」会被 GitHub 存成「_1.0.0.exe」，非 ASCII 字符丢失。
+        # 实测：上传「网络医生_1.0.0.exe」会被 GitHub 存成「_1.0.0.exe」，非 ASCII 字符丢失。
         $packager = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRReleasePackage.ps1') -Raw -Encoding UTF8
-        $packager | Should -Match ([regex]::Escape('NetworkRepair-{0}-Portable.exe'))
+        $packager | Should -Match ([regex]::Escape('NetMedic-{0}-Portable.exe'))
 
         # 中文显示名改由附件 label 承载，并且打标签逻辑放在带 BOM 的仓库脚本里，
         # 这样发布工作流步骤可以保持纯 ASCII。
@@ -896,7 +896,7 @@
         (Test-Path -LiteralPath $labelTool) | Should -BeTrue
         $labelText = Get-Content -LiteralPath $labelTool -Raw -Encoding UTF8
         $labelText | Should -Match 'label'
-        $labelText | Should -Match '网络修复工具'
+        $labelText | Should -Match '网络医生'
 
         $release = Get-Content -LiteralPath (Join-Path $root '.github\workflows\release.yml') -Raw -Encoding UTF8
         $release | Should -Match ([regex]::Escape('Set-NRReleaseAssetLabels.ps1'))
@@ -990,7 +990,7 @@
     }
 
     It 'ships a valid multi-size application icon' {
-        $iconPath = Join-Path $root 'assets\NetworkRepair.ico'
+        $iconPath = Join-Path $root 'assets\NetMedic.ico'
         (Test-Path -LiteralPath $iconPath) | Should -BeTrue
 
         $bytes = [IO.File]::ReadAllBytes($iconPath)
@@ -1028,7 +1028,7 @@
     It 'embeds the icon in the executable and applies it to the window' {
         $tool = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -Raw -Encoding UTF8
         $tool | Should -Match 'IconFile'
-        $tool | Should -Match ([regex]::Escape('assets\NetworkRepair.ico'))
+        $tool | Should -Match ([regex]::Escape('assets\NetMedic.ico'))
 
         $gui = Get-Content -LiteralPath (Join-Path $root 'src\Gui.ps1') -Raw -Encoding UTF8
         $gui | Should -Match 'Get-NRGuiApplicationIcon'
@@ -1096,11 +1096,11 @@
         Mock -CommandName Invoke-RestMethod -MockWith {
             [pscustomobject]@{
                 tag_name     = 'v9.9.9'
-                name         = 'NetworkRepair v9.9.9'
+                name         = 'NetMedic v9.9.9'
                 html_url     = 'https://example.invalid/releases/tag/v9.9.9'
                 published_at = '2026-01-01T00:00:00Z'
                 prerelease   = $false
-                assets       = @([pscustomobject]@{ name = 'NetworkRepair-9.9.9-Portable.exe' })
+                assets       = @([pscustomobject]@{ name = 'NetMedic-9.9.9-Portable.exe' })
             }
         }
         $result = Get-NRLatestRelease -CurrentVersion '1.2.0'
