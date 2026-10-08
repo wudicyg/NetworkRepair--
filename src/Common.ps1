@@ -28,7 +28,16 @@ function Get-NRProfileRegistryObjects {
     $base=Join-Path (Get-NRRegistryRoot) 'Profiles'; if (-not (Test-Path -LiteralPath $base)) { return @() }
     $result=foreach($item in Get-ChildItem -LiteralPath $base -ErrorAction Stop){
         $props=Get-ItemProperty -LiteralPath $item.PSPath -ErrorAction SilentlyContinue
-        [pscustomobject]@{KeyName=$item.PSChildName;ProfileName=[string]$props.ProfileName;Description=[string]$props.Description;Category=$props.Category;Managed=$props.Managed;RegistryPath=$item.PSPath;LastWrite=(Get-Item -LiteralPath $item.PSPath).LastWriteTime}
+        $lastWrite=$null
+        try {
+            $lastWriteProperty=$item.PSObject.Properties['LastWriteTime']
+            if ($null -ne $lastWriteProperty) {
+                $lastWrite=$lastWriteProperty.Value
+            }
+        } catch {
+            $lastWrite=$null
+        }
+        [pscustomobject]@{KeyName=$item.PSChildName;ProfileName=[string]$props.ProfileName;Description=[string]$props.Description;Category=$props.Category;Managed=$props.Managed;RegistryPath=$item.PSPath;LastWrite=$lastWrite}
     }; @($result)
 }
 function Get-NRActiveProfileNames { try { @(Get-NetConnectionProfile -ErrorAction Stop | Where-Object Name | Select-Object -ExpandProperty Name -Unique) } catch { Write-NRLog ('Get-NetConnectionProfile failed: {0}' -f $_.Exception.Message) 'WARN'; @() } }

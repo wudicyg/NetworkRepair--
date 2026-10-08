@@ -32,12 +32,31 @@ function Get-NRIPDiagnostics {
             $dns4 = @(Get-DnsClientServerAddress -InterfaceIndex $index -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ServerAddresses)
             $dns6 = @(Get-DnsClientServerAddress -InterfaceIndex $index -AddressFamily IPv6 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ServerAddresses)
             $gateway = @()
-            if ($cfg.IPv4DefaultGateway) { $gateway = @($cfg.IPv4DefaultGateway | Select-Object -ExpandProperty NextHop -First 1) }
+
+            $ipv4Addresses = @()
+            $ipv4Property = $cfg.PSObject.Properties['IPv4Address']
+            if ($null -ne $ipv4Property -and $null -ne $ipv4Property.Value) {
+                $ipv4Addresses = @($ipv4Property.Value | ForEach-Object { [string]$_.IPv4Address })
+            }
+
+            $ipv6Addresses = @()
+            $ipv6Property = $cfg.PSObject.Properties['IPv6Address']
+            if ($null -ne $ipv6Property -and $null -ne $ipv6Property.Value) {
+                $ipv6Addresses = @($ipv6Property.Value | ForEach-Object { [string]$_.IPv6Address })
+            }
+
+            $gatewayProperty = $cfg.PSObject.Properties['IPv4DefaultGateway']
+            if ($null -ne $gatewayProperty -and $null -ne $gatewayProperty.Value) {
+                $gateway = @($gatewayProperty.Value | Where-Object { $_ } | ForEach-Object {
+                    if ($_.PSObject.Properties['NextHop']) { [string]$_.NextHop }
+                } | Where-Object { $_ })
+            }
+
             $rows += [pscustomobject]@{
-                InterfaceAlias = $cfg.InterfaceAlias
+                InterfaceAlias = [string]$cfg.InterfaceAlias
                 InterfaceIndex = $index
-                IPv4Addresses = @($cfg.IPv4Address | ForEach-Object { [string]$_.IPv4Address })
-                IPv6Addresses = @($cfg.IPv6Address | ForEach-Object { [string]$_.IPv6Address })
+                IPv4Addresses = @($ipv4Addresses)
+                IPv6Addresses = @($ipv6Addresses)
                 IPv4Gateway = @($gateway)
                 IPv4Dhcp = if ($ipv4Interface) { [string]$ipv4Interface.Dhcp } else { $null }
                 IPv6Dhcp = if ($ipv6Interface) { [string]$ipv6Interface.Dhcp } else { $null }
@@ -45,7 +64,8 @@ function Get-NRIPDiagnostics {
                 DnsServersIPv6 = @($dns6)
             }
         }
-    } catch {
+    }
+    catch {
         Write-NRLog ('IP diagnostics failed: {0}' -f $_.Exception.Message) 'WARN'
     }
     @($rows)
@@ -137,34 +157,141 @@ function Get-NRSuspiciousProfiles {
 function Get-NRDiagnostics {
     param([switch]$SkipConnectivityTest)
 
-    $windows = Get-NRWindowsInfo
-    $adapters = Get-NRAdapters
-    $connections = Get-NRConnectionProfiles
-    $registryProfiles = Get-NRProfileRegistryObjects
+    $diagnosticErrors = @()
 
-    $nlm = Get-NRNetworkListManagerNetworks
-    $activeNames = @(Get-NRActiveProfileNames)
-    $nlmActiveNames = if ($nlm.Available) { @($nlm.Networks | Where-Object IsConnected | Select-Object -ExpandProperty Name -Unique) } else { @() }
-    $identityCorrelations = if ($nlm.Available) { @(Get-NRNetworkIdentityCorrelation -RegistryProfiles $registryProfiles -NlmNetworks $nlm.Networks) } else { @() }
-    $suspects = @(Get-NRSuspiciousProfiles -RegistryProfiles $registryProfiles -ActiveNames $activeNames -NlmActiveNames $nlmActiveNames -IdentityCorrelations $identityCorrelations)
+    try { $windows = Get-NRWindowsInfo }
+    catch {
+        $diagnosticErrors += 'Windows 信息读取失败：' + $_.Exception.Message
+        $windows = [pscustomobject]@{
+            Caption = 'Unknown'
+            Version = $null
+            Build = $null
+            Architecture = $null
+            PowerShell = $PSVersionTable.PSVersion.ToString()
+        }
+    }
 
-    $ip = Get-NRIPDiagnostics
-    $gateways = @(Test-NRGateways -Configurations $ip)
-    $dnsServers = @(Test-NRDnsServers -Configurations $ip)
-    $ncsi = Test-NRNcsi -Skip:$SkipConnectivityTest
-    $networkHealth = Get-NRNetworkHealthAssessment -Connections $connections -NCSI $ncsi
+    try { $adapters = @(Get-NRAdapters) }
+    catch {
+        $diagnosticErrors += '网络适配器读取失败：' + $_.Exception.Message
+        $adapters = @()
+    }
 
-    $safeCandidates = @($suspects | Where-Object RemediationAllowed)
+    try { $connections = @(Get-NRConnectionProfiles) }
+    catch {
+        $diagnosticErrors += 'Connection Profile 读取失败：' + $_.Exception.Message
+        $connections = @()
+    }
+
+    try { $registryProfiles = @(Get-NRProfileRegistryObjects) }
+    catch {
+        $diagnosticErrors += '注册表 Profile 读取失败：' + $_.Exception.Message
+        $registryProfiles = @()
+    }
+
+    try { $nlm = Get-NRNetworkListManagerNetworks }
+    catch {
+        $diagnosticErrors += 'Network List Manager 诊断失败：' + $_.Exception.Message
+        $nlm = [pscustomobject]@{ Available = $false; Networks = @(); Error = $_.Exception.Message }
+    }
+
+    $activeNames = @($connections | Where-Object { $_.Name } | Select-Object -ExpandProperty Name -Unique)
+    $nlmActiveNames = @()
+    if ($nlm.Available) {
+        try {
+            $nlmActiveNames = @($nlm.Networks | Where-Object IsConnected | Select-Object -ExpandProperty Name -Unique)
+        }
+        catch {
+            $diagnosticErrors += 'NLM 活动网络读取失败：' + $_.Exception.Message
+        }
+    }
+
+    $identityCorrelations = @()
+    if ($nlm.Available) {
+        try { $identityCorrelations = @(Get-NRNetworkIdentityCorrelation -RegistryProfiles $registryProfiles -NlmNetworks $nlm.Networks) }
+        catch { $diagnosticErrors += 'NetworkId 关联诊断失败：' + $_.Exception.Message }
+    }
+
+    try {
+        $suspects = @(Get-NRSuspiciousProfiles -RegistryProfiles $registryProfiles -ActiveNames $activeNames -NlmActiveNames $nlmActiveNames -IdentityCorrelations $identityCorrelations)
+    }
+    catch {
+        $diagnosticErrors += 'Profile 风险分析失败：' + $_.Exception.Message
+        $suspects = @()
+    }
+
+    try { $ip = @(Get-NRIPDiagnostics) }
+    catch {
+        $diagnosticErrors += 'IP 诊断失败：' + $_.Exception.Message
+        $ip = @()
+    }
+
+    $gateways = @()
+    if (@($ip).Count -gt 0) {
+        try { $gateways = @(Test-NRGateways -Configurations @($ip)) }
+        catch { $diagnosticErrors += '网关诊断失败：' + $_.Exception.Message }
+    }
+
+    $dnsServers = @()
+    if (@($ip).Count -gt 0) {
+        try { $dnsServers = @(Test-NRDnsServers -Configurations @($ip)) }
+        catch { $diagnosticErrors += 'DNS 服务器诊断失败：' + $_.Exception.Message }
+    }
+
+    try { $ncsi = Test-NRNcsi -Skip:$SkipConnectivityTest }
+    catch {
+        $diagnosticErrors += 'NCSI 诊断失败：' + $_.Exception.Message
+        $ncsi = [pscustomobject]@{
+            Skipped = $true
+            Enabled = $null
+            Dns = $null
+            Http = $null
+            DnsHost = $null
+            WebUrl = $null
+            DnsError = $_.Exception.Message
+            HttpError = $null
+            Configuration = $null
+        }
+    }
+
+    try { $networkHealth = Get-NRNetworkHealthAssessment -Connections @($connections) -NCSI $ncsi }
+    catch {
+        $diagnosticErrors += '网络健康评估失败：' + $_.Exception.Message
+        $networkHealth = [pscustomobject]@{
+            Status = 'Unknown'
+            OperationallyHealthy = $false
+            Reason = '网络健康评估无法完成。'
+            NCSIHealthy = $false
+            NCSIKnown = $false
+            InternetProfileCount = 0
+        }
+    }
+
+    $safeCandidates = @($suspects | Where-Object { $_.RemediationAllowed })
     $highRisk = @($suspects | Where-Object { $_.RiskLevel -eq 'High' -or $_.RiskLevel -eq 'Caution' })
-    $issueDetails = New-Object System.Collections.Generic.List[object]
+    $issueDetails = @()
 
-    if ($safeCandidates.Count) { [void]$issueDetails.Add([pscustomobject]@{Code='NR1001';Severity='Low';Message=('发现 {0} 个疑似历史/重复网络 Profile。' -f $safeCandidates.Count)}) }
-    if ($highRisk.Count) { [void]$issueDetails.Add([pscustomobject]@{Code='NR1002';Severity='Warning';Message=('发现 {0} 个高风险或需人工确认的 Profile。' -f $highRisk.Count)}) }
-    if (@($gateways | Where-Object { -not $_.Reachable }).Count) { [void]$issueDetails.Add([pscustomobject]@{Code='NR2201';Severity='Warning';Message='一个或多个默认网关不可达。'}) }
-    if (@($dnsServers | Where-Object { -not $_.ResolvesNCSI }).Count) { [void]$issueDetails.Add([pscustomobject]@{Code='NR2101';Severity='Warning';Message='一个或多个配置的 DNS 服务器无法解析 NCSI DNS 主机。'}) }
-    if (-not $SkipConnectivityTest -and $ncsi.Enabled -eq 0) { [void]$issueDetails.Add([pscustomobject]@{Code='NR2003';Severity='Warning';Message='NCSI 主动探测已被禁用。'}) }
-    if (-not $SkipConnectivityTest -and -not $ncsi.Dns) { [void]$issueDetails.Add([pscustomobject]@{Code='NR2001';Severity='Warning';Message='NCSI DNS 探测失败。'}) }
-    if (-not $SkipConnectivityTest -and -not $ncsi.Http) { [void]$issueDetails.Add([pscustomobject]@{Code='NR2002';Severity='Warning';Message='NCSI HTTP Web 探测失败。'}) }
+    if (@($safeCandidates).Count -gt 0) {
+        $issueDetails += [pscustomobject]@{Code='NR1001';Severity='Low';Message=('发现 {0} 个疑似历史/重复网络 Profile。' -f @($safeCandidates).Count)}
+    }
+    if (@($highRisk).Count -gt 0) {
+        $issueDetails += [pscustomobject]@{Code='NR1002';Severity='Warning';Message=('发现 {0} 个高风险或需人工确认的 Profile。' -f @($highRisk).Count)}
+    }
+    if (@($gateways | Where-Object { -not $_.Reachable }).Count -gt 0) {
+        $issueDetails += [pscustomobject]@{Code='NR2201';Severity='Warning';Message='一个或多个默认网关不可达。'}
+    }
+    if (@($dnsServers | Where-Object { -not $_.ResolvesNCSI }).Count -gt 0) {
+        $issueDetails += [pscustomobject]@{Code='NR2101';Severity='Warning';Message='一个或多个配置的 DNS 服务器无法解析 NCSI DNS 主机。'}
+    }
+    if (-not $SkipConnectivityTest -and $ncsi.Enabled -eq 0) {
+        $issueDetails += [pscustomobject]@{Code='NR2003';Severity='Warning';Message='NCSI 主动探测已被禁用。'}
+    }
+    if (-not $SkipConnectivityTest -and -not $ncsi.Dns) {
+        $issueDetails += [pscustomobject]@{Code='NR2001';Severity='Warning';Message='NCSI DNS 探测失败。'}
+    }
+    if (-not $SkipConnectivityTest -and -not $ncsi.Http) {
+        $issueDetails += [pscustomobject]@{Code='NR2002';Severity='Warning';Message='NCSI HTTP Web 探测失败。'}
+    }
 
     $connectivity = [pscustomobject]@{
         Skipped = $ncsi.Skipped
@@ -177,14 +304,14 @@ function Get-NRDiagnostics {
         $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
     })
     $profileHygieneStatus = 'Clean'
-    if ($safeCandidates.Count -gt 0) {
+    if (@($safeCandidates).Count -gt 0) {
         $profileHygieneStatus = 'HistoricalProfilesFound'
-    } elseif ($numberedProfiles.Count -gt 0) {
+    } elseif (@($numberedProfiles).Count -gt 0) {
         $profileHygieneStatus = 'ProtectedNumberedProfilesPresent'
     }
 
     $repairRecommendation = 'InvestigateNetwork'
-    if ($safeCandidates.Count -gt 0) {
+    if (@($safeCandidates).Count -gt 0) {
         $repairRecommendation = 'CleanHistoricalProfiles'
     } elseif ($networkHealth.Status -eq 'Healthy') {
         $repairRecommendation = 'NoAction'
@@ -209,10 +336,11 @@ function Get-NRDiagnostics {
         NetworkHealth = $networkHealth
         ProfileHygieneStatus = $profileHygieneStatus
         RepairRecommendation = $repairRecommendation
+        DiagnosticsErrors = @($diagnosticErrors)
         Issues = @($issueDetails | ForEach-Object Message)
         IssueDetails = @($issueDetails)
-        SafeCandidateCount = $safeCandidates.Count
-        HighRiskCount = $highRisk.Count
+        SafeCandidateCount = @($safeCandidates).Count
+        HighRiskCount = @($highRisk).Count
     }
 }
 

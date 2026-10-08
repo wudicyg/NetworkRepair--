@@ -10,6 +10,36 @@
         . (Join-Path $root 'src\Backup.ps1')
     }
 
+    It 'accepts registry profile input without LastWriteTime metadata' {
+        $p=[pscustomobject]@{KeyName='x';ProfileName='网络 9';Category=0;Managed=0;RegistryPath='HKLM:\\dummy'}
+        $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
+        $r.RiskLevel | Should -Be 'Low'
+        $r.RemediationAllowed | Should -BeTrue
+        $r.LastWrite | Should -BeNullOrEmpty
+    }
+
+    It 'handles interfaces without an IPv4Address property' {
+        Mock -CommandName Get-NetIPConfiguration -MockWith {
+            [pscustomobject]@{
+                InterfaceIndex = 99
+                InterfaceAlias = 'TestVirtual'
+                IPv6Address = @()
+                IPv4DefaultGateway = $null
+            }
+        }
+        Mock -CommandName Get-NetIPInterface -MockWith {
+            [pscustomobject]@{ Dhcp = 'Disabled' }
+        }
+        Mock -CommandName Get-DnsClientServerAddress -MockWith {
+            [pscustomobject]@{ ServerAddresses = @() }
+        }
+        $r=@(Get-NRIPDiagnostics)
+        $r.Count | Should -Be 1
+        $r[0].InterfaceAlias | Should -Be 'TestVirtual'
+        $r[0].IPv4Addresses.Count | Should -Be 0
+        $r[0].IPv6Addresses.Count | Should -Be 0
+    }
+
     It 'marks an inactive Chinese numbered profile as Low and removable' {
         $p=[pscustomobject]@{KeyName='x';ProfileName='网络 3';Category=0;Managed=0;RegistryPath='HKLM:\dummy';LastWrite=(Get-Date)}
         $r=@(Get-NRSuspiciousProfiles -RegistryProfiles @($p) -ActiveNames @())[0]
