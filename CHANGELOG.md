@@ -19,6 +19,9 @@
 
 
 ### Fixed
+- Deep Repair 在网络健康且没有可安全清理 Profile 时不再生成破坏性 `NewNetworks` 刷新动作。
+- 注册表 Profile 扫描容忍缺失的可选 `ProfileName`、`Description`、`Category`、`Managed` 属性。
+- 修复脱敏诊断包对 `网络 N` / `Network N` 编号 Profile 的分类与计数正则。
 - 扫描兼容缺失 `LastWriteTime` 的 Registry Provider 对象。
 - NLM COM 不可用时降级为 PowerShell / 注册表诊断，不阻断 Scan。
 - 兼容缺失 `IPv4Address` 属性的网络接口对象。
