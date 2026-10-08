@@ -1,4 +1,12 @@
-# Changelog
+﻿# Changelog
+
+## [0.4.0-dev]
+
+### Added
+- 独立修复决策计划层，统一 Dry Run 与真实修复路径。
+- Deep Repair 在无可删除 Profile 时仍可明确执行 `NewNetworks` 刷新。
+- Restore 完成注册表快照校验；校验失败时自动回到恢复前安全备份并再次验证。
+- 增加修复计划与注册表快照比较回归测试。
 
 ## [0.3.0-dev]
 
@@ -20,7 +28,6 @@
 ### Changed
 - Safe Repair 改为依据 `RemediationAllowed` 安全门槛执行。
 - 修复后验证增加 IP 与默认网关完整性检查。
-
 
 
 ## [0.1.1] - 2026-10-08
