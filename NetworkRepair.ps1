@@ -15,7 +15,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Script:AppName = 'NetworkRepair'
-$Script:AppVersion = '1.1.0'
+$Script:AppVersion = '1.2.0'
 # 入口路径解析：以脚本宿主（powershell.exe -File）运行时取脚本自身路径；打包成单个 exe 后
 # $MyInvocation.MyCommand 没有 Path 属性，需要退回到进程映像与应用程序基目录，否则在
 # Set-StrictMode -Version Latest 下会直接抛「找不到属性 Path」。
