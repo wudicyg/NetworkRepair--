@@ -844,4 +844,21 @@
         $common | Should -Match 'ScriptHost'
         $common | Should -Match 'EntryPath'
     }
+
+    It 'keeps GitHub workflow files free of non-ASCII text' {
+        # runner 会把 run 脚本写成「不带 BOM 的 UTF-8」临时文件，Windows PowerShell 5.1 在中文
+        # 区域按 ANSI 解码后，内联中文会被还原成引号并导致整个步骤解析失败（真实踩过）。
+        # 因此工作流保持纯 ASCII，中文只出现在带 BOM 的仓库脚本里。
+        $workflowDirectory = Join-Path $root '.github\workflows'
+        $workflows = @(Get-ChildItem -LiteralPath $workflowDirectory -File -Filter *.yml)
+        $workflows.Count | Should -BeGreaterThan 0
+
+        $offenders = @()
+        foreach ($workflow in $workflows) {
+            $text = Get-Content -LiteralPath $workflow.FullName -Raw -Encoding UTF8
+            $nonAscii = @($text.ToCharArray() | Where-Object { [int]$_ -gt 127 })
+            if ($nonAscii.Count -gt 0) { $offenders += ('{0}（{1} 个非 ASCII 字符）' -f $workflow.Name, $nonAscii.Count) }
+        }
+        $offenders.Count | Should -Be 0 -Because ('工作流文件必须保持纯 ASCII：' + ($offenders -join ', '))
+    }
 }
