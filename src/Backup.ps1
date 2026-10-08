@@ -1,4 +1,5 @@
 ﻿function New-NRBackup {
+    param([ValidateSet('Manual','PreRepair','PreRestore')][string]$Level='Manual')
     $stamp=Get-Date -Format 'yyyyMMdd_HHmmss_fff';$dir=Join-Path $Script:Backups $stamp;New-Item -ItemType Directory -Path $dir -Force|Out-Null
     $reg=Join-Path $dir 'NetworkList.reg'
     $profilesReg=Join-Path $dir 'NetworkList-Profiles.reg'
@@ -21,8 +22,9 @@
         Write-NRLog 'NewNetworks registry key not present; scoped backup skipped.' 'WARN'
     }
     $d=Get-NRDiagnostics -SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $diag -Encoding UTF8
-    [pscustomobject]@{App=$Script:AppName;Version=$Script:AppVersion;Timestamp=(Get-Date).ToString('o');RegistryBackup=$reg;ProfilesBackup=$profilesReg;NewNetworksBackup=$newNetworksReg;DiagnosticSnapshot=$diag;ComputerName=$env:COMPUTERNAME}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $meta -Encoding UTF8
-    Write-NRLog ('Backup complete: {0}'-f $dir);[pscustomobject]@{Success=$true;Path=$dir;RegistryBackup=$reg;ProfilesBackup=$profilesReg;NewNetworksBackup=$newNetworksReg;Manifest=$meta;Diagnostic=$diag}
+    [pscustomobject]@{App=$Script:AppName;Version=$Script:AppVersion;Level=$Level;Pinned=$false;Timestamp=(Get-Date).ToString('o');RegistryBackup=$reg;ProfilesBackup=$profilesReg;NewNetworksBackup=$newNetworksReg;DiagnosticSnapshot=$diag;ComputerName=$env:COMPUTERNAME}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $meta -Encoding UTF8
+    if(Get-Command Get-NRRestorePoints -ErrorAction SilentlyContinue){$pointCount=@(Get-NRRestorePoints).Count;if($pointCount -gt 20){Write-NRLog ('Restore point count {0} exceeds the warning threshold of 20; consider running restore point pruning.'-f $pointCount) 'WARN'}}
+    Write-NRLog ('Backup complete: {0}'-f $dir);[pscustomobject]@{Success=$true;Path=$dir;Level=$Level;RegistryBackup=$reg;ProfilesBackup=$profilesReg;NewNetworksBackup=$newNetworksReg;Manifest=$meta;Diagnostic=$diag}
 }
 
 function Resolve-NRBackupRegistryFile {
@@ -154,7 +156,9 @@ function Invoke-NRRestoreSafetyRollback {
 }
 
 function Restore-NRBackup {
-    param([Parameter(Mandatory)][string]$BackupPath,[switch]$AssumeYes)
+    param([string]$BackupPath,[int]$RestorePointIndex=0,[switch]$AssumeYes)
+    if($RestorePointIndex -gt 0){$selected=Resolve-NRRestorePoint -RestorePoints @(Get-NRRestorePoints) -Index $RestorePointIndex;$BackupPath=$selected.Path;Write-NRLog ('Restore point selected: [{0}] {1} ({2})'-f $selected.Index,$selected.Path,$selected.Level)}
+    if([string]::IsNullOrWhiteSpace($BackupPath)){throw 'Restore 需要提供 -BackupPath 或 -RestorePointIndex。'}
     $reg=Resolve-NRBackupRegistryFile -Path $BackupPath
     $profilesReg=Resolve-NRScopedBackupFile -BackupPath $reg -ScopeName 'Profiles'
     $newNetworksReg=Resolve-NRScopedBackupFile -BackupPath $reg -ScopeName 'NewNetworks'
@@ -163,7 +167,7 @@ function Restore-NRBackup {
     }
     if(!(Confirm-NRAction -Message ('即将恢复 NetworkRepair 管理的 Profiles/NewNetworks 范围，原始完整备份仍保留。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
 
-    $preRestore=New-NRBackup
+    $preRestore=New-NRBackup -Level 'PreRestore'
     try {
         Write-NRLog ('Restore safety backup created: {0}'-f $preRestore.Path)
         & reg.exe import $profilesReg|Out-Null
