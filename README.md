@@ -238,7 +238,12 @@ NetworkRepair/
 │  ├─ Invoke-NRReadOnlyValidation.ps1
 │  ├─ Export-NRSanitizedDiagnosticBundle.ps1
 │  ├─ New-NRSingleFileDistribution.ps1
-│  └─ New-NRReleasePackage.ps1
+│  ├─ New-NRIcon.ps1
+│  ├─ New-NRReleasePackage.ps1
+│  ├─ Test-NRReleasePackage.ps1
+│  └─ Set-NRReleaseAssetLabels.ps1
+├─ assets/
+│  └─ NetworkRepair.ico
 ├─ docs/
 ├─ backups/
 ├─ logs/

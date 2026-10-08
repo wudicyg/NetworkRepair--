@@ -976,4 +976,58 @@
         # 备用启动器必须显式回到控制台 TUI，否则控制台入口会消失。
         $tool | Should -Match ([regex]::Escape('-Mode Menu'))
     }
+
+    It 'ships a valid multi-size application icon' {
+        $iconPath = Join-Path $root 'assets\NetworkRepair.ico'
+        (Test-Path -LiteralPath $iconPath) | Should -BeTrue
+
+        $bytes = [IO.File]::ReadAllBytes($iconPath)
+        ([BitConverter]::ToUInt16($bytes, 0)) | Should -Be 0      # reserved
+        ([BitConverter]::ToUInt16($bytes, 2)) | Should -Be 1      # type = icon
+        $count = [BitConverter]::ToUInt16($bytes, 4)
+        $count | Should -BeGreaterOrEqual 4
+
+        $sizes = @()
+        $totalImageBytes = 0
+        for ($i = 0; $i -lt $count; $i++) {
+            $entry = 6 + 16 * $i
+            $dimension = $bytes[$entry]
+            if ($dimension -eq 0) { $dimension = 256 }
+            $sizes += [int]$dimension
+            $totalImageBytes += [int][BitConverter]::ToUInt32($bytes, $entry + 8)
+        }
+        $sizes | Should -Contain 16
+        $sizes | Should -Contain 32
+        $sizes | Should -Contain 48
+
+        # 曾经写出过「只有目录、没有图像数据」的坏 ICO，这里确认每个条目都真的带数据。
+        $totalImageBytes | Should -BeGreaterThan 4096
+        ($bytes.Length - 6 - 16 * $count) | Should -BeGreaterOrEqual $totalImageBytes
+
+        # 能被 System.Drawing 解析才说明结构有效（PS7 上没有该程序集时跳过这一段）。
+        $iconType = $null
+        try { Add-Type -AssemblyName System.Drawing -ErrorAction Stop; $iconType = 'System.Drawing.Icon' -as [type] } catch { }
+        if ($iconType) {
+            $icon = New-Object System.Drawing.Icon($iconPath)
+            try { $icon.Width | Should -BeGreaterThan 0 } finally { $icon.Dispose() }
+        }
+    }
+
+    It 'embeds the icon in the executable and applies it to the window' {
+        $tool = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -Raw -Encoding UTF8
+        $tool | Should -Match 'IconFile'
+        $tool | Should -Match ([regex]::Escape('assets\NetworkRepair.ico'))
+
+        $gui = Get-Content -LiteralPath (Join-Path $root 'src\Gui.ps1') -Raw -Encoding UTF8
+        $gui | Should -Match 'Get-NRGuiApplicationIcon'
+        $gui | Should -Match 'ExtractAssociatedIcon'
+        $gui | Should -Match ([regex]::Escape('$form.Icon = '))
+
+        # 图标是可由生成器重建的产物，生成器必须留在仓库里。
+        (Test-Path -LiteralPath (Join-Path $root 'tools\New-NRIcon.ps1')) | Should -BeTrue
+
+        # 发布包要带上 assets，脚本方式运行时才能取到窗口图标。
+        $packager = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRReleasePackage.ps1') -Raw -Encoding UTF8
+        $packager | Should -Match ([regex]::Escape("'assets'"))
+    }
 }

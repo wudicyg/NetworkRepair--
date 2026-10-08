@@ -195,6 +195,31 @@ function New-NRGuiStatusCard {
     $box
 }
 
+function Get-NRGuiApplicationIcon {
+    <#
+        窗口与任务栏图标：打包成 exe 时用 exe 自身的图标；以脚本方式运行时退回包内的
+        assets\NetworkRepair.ico。两条路都拿不到就返回 $null（用系统默认图标）。
+    #>
+    $isScriptHost = [bool](Get-Variable -Name 'ScriptHost' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
+    if (-not $isScriptHost) {
+        try {
+            $hostImage = [string](Get-Variable -Name 'HostImage' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
+            if ($hostImage -and (Test-Path -LiteralPath $hostImage)) {
+                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($hostImage)
+                if ($icon) { return $icon }
+            }
+        } catch { }
+    }
+    try {
+        $root = [string](Get-Variable -Name 'Root' -Scope Script -ValueOnly -ErrorAction SilentlyContinue)
+        if ($root) {
+            $candidate = Join-Path $root 'assets\NetworkRepair.ico'
+            if (Test-Path -LiteralPath $candidate) { return (New-Object System.Drawing.Icon($candidate)) }
+        }
+    } catch { }
+    $null
+}
+
 function New-NRGuiForm {
     Initialize-NRGuiAssemblies
 
@@ -206,6 +231,8 @@ function New-NRGuiForm {
     $form.StartPosition = 'CenterScreen'
     $form.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9)
     $form.BackColor = [System.Drawing.Color]::WhiteSmoke
+    $applicationIcon = Get-NRGuiApplicationIcon
+    if ($applicationIcon) { $form.Icon = $applicationIcon }
 
     $root = New-Object System.Windows.Forms.TableLayoutPanel
     $root.Name = 'rootLayout'

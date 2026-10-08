@@ -75,7 +75,8 @@ $files = @(
 $directories = @(
     'src',
     'docs',
-    'tools'
+    'tools',
+    'assets'
 )
 
 if (Test-Path -LiteralPath $OutputDirectory) {
@@ -170,6 +171,7 @@ $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvar
     EntryName         = $ExecutableName
     SingleScript      = $distribution.SingleScript
     Launcher          = $distribution.Launcher
+    Icon              = $distribution.Icon
     InlinedModules    = $distribution.InlinedModuleCount
     ElevationVerified = $distribution.ElevationVerified
 } | ConvertTo-Json -Depth 5

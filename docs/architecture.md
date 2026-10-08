@@ -74,6 +74,7 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 - **可验证性**：`-Mode GuiSmoke` 会构建完整窗口、核对关键控件与尺寸后释放，不接触系统状态也不需要管理员权限，CI 因此能真正验证界面代码可以构建。
 - **窗口化打包**：分发脚本默认 `DefaultMode = 'Gui'`，编译时传入 `-noConsole -STA -DPIAware`；控制台 TUI 由备用启动器显式以 `-Mode Menu` 进入。
 - **必须同时加 `-noOutput`**：ps2exe 在无控制台模式下会把脚本输出（`Write-Output` 与 `Write-Host` 都算）收集起来，用一个模态对话框显示，进程会一直等到用户点「确定」。实测不加该开关时，打包后的 exe 一有输出就弹窗并卡住；CI 因此用「带超时的等待 + 退出码」而不是无限等待来验证图形版启动。
+- **应用图标**：`assets/NetworkRepair.ico` 由 `tools/New-NRIcon.ps1` 生成（可重复生成，仓库里不存手改的二进制）。exe 编译时通过 `-iconFile` 嵌入；窗口图标在打包运行时用 `Icon::ExtractAssociatedIcon` 取自自身进程映像，脚本方式运行时回退到包内 `assets\NetworkRepair.ico`。小尺寸用传统 DIB 条目、大尺寸用 PNG 条目压缩，兼顾兼容性与体积。
 
 ## Diagnostic layers
 
