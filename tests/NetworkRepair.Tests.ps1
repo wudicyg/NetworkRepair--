@@ -25,7 +25,10 @@
         $content | Should -Match 'Invoke-NRRepair -Deep:\$false -AssumeYes:\$Yes -SkipConnectivityTest:\$SkipConnectivityTest'
         $content | Should -Match 'Invoke-NRRepair -Deep:\$true -AssumeYes:\$Yes -SkipConnectivityTest:\$SkipConnectivityTest'
         $content | Should -Match 'Export-NRReport -SkipConnectivityTest:\$SkipConnectivityTest'
-        $content | Should -Match 'Invoke-NRRepair -Deep:\$false -DryRun -AssumeYes:\$false -SkipConnectivityTest:\$SkipConnectivityTest'
+        $content | Should -Not -Match '\bDryRun\b'
+        $content | Should -Not -Match 'Invoke-NRRepair -Deep:\$false -DryRun'
+        $content | Should -Match ([regex]::Escape("Write-NRLine '  [7] 安全重命名网络（显式指定名称）' 'White'"))
+        $content | Should -Not -Match ([regex]::Escape("Write-NRLine '  [8]"))
     }
     It 'shows the read-only quick status in the interactive menu' {
         $entryPath = Join-Path $root 'NetworkRepair.ps1'
