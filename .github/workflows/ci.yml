@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -67,12 +67,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Install ps2exe
+        run: Install-Module ps2exe -Force -Scope CurrentUser -SkipPublisherCheck
+
       - name: Build release package
         run: |
           $result = & .\tools\New-NRReleasePackage.ps1 -OutputDirectory .\release-check | ConvertFrom-Json
           if (-not $result.Success) { throw 'Release package build failed.' }
           if (-not (Test-Path -LiteralPath $result.Package)) { throw 'Release ZIP was not created.' }
           if (-not (Test-Path -LiteralPath $result.Sha256)) { throw 'Release SHA-256 file was not created.' }
+          Write-Host "Entry: $($result.EntryName)"
+          Write-Host "Inlined modules: $($result.InlinedModules)"
+          Write-Host "Elevation manifest verified: $($result.ElevationVerified)"
 
       - name: Inspect release package contents
         run: |
@@ -83,7 +89,7 @@ jobs:
             Expand-Archive -LiteralPath $zip.FullName -DestinationPath $temp -Force
             $root = Get-ChildItem -LiteralPath $temp -Directory | Select-Object -First 1
             if (-not $root) { throw 'Release package root directory is missing.' }
-            foreach ($required in @('NetworkRepair.bat','NetworkRepair.ps1','README.md','LICENSE','CHANGELOG.md','src','docs','tools','RELEASE-MANIFEST.txt')) {
+            foreach ($required in @('网络修复工具.exe','NetworkRepair.single.ps1','使用说明.md','备用启动','NetworkRepair.ps1','README.md','LICENSE','CHANGELOG.md','src','docs','tools','RELEASE-MANIFEST.txt')) {
               if (-not (Test-Path -LiteralPath (Join-Path $root.FullName $required))) {
                 throw "Required release content missing: $required"
               }
@@ -92,6 +98,10 @@ jobs:
               if (Test-Path -LiteralPath (Join-Path $root.FullName $forbidden)) {
                 throw "Forbidden runtime/development content included: $forbidden"
               }
+            }
+            # 面向普通用户的包只保留一个显式入口，旧的 ASCII 启动器不再随包分发。
+            if (Test-Path -LiteralPath (Join-Path $root.FullName 'NetworkRepair.bat')) {
+              throw 'Legacy ASCII launcher must not be shipped in the friendly package.'
             }
           } finally {
             Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
@@ -111,8 +121,10 @@ jobs:
       - name: Verify release package checksum
         run: |
           $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
-          $shaFile = Get-ChildItem .\release-check\*.sha256 | Select-Object -First 1
-          if (-not $zip -or -not $shaFile) { throw 'Release package checksum inputs are missing.' }
+          if (-not $zip) { throw 'Release package checksum inputs are missing.' }
+          # 现在会同时产出「打包 zip」与「便携 exe」两份校验文件，必须按同名匹配。
+          $shaFile = Get-ChildItem .\release-check\*.sha256 | Where-Object { $_.BaseName -eq $zip.BaseName } | Select-Object -First 1
+          if (-not $shaFile) { throw 'Release package checksum file is missing.' }
           $lines = @(Get-Content -LiteralPath $shaFile.FullName -Encoding ASCII | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
           if ($lines.Count -ne 1) { throw 'Release SHA-256 file must contain exactly one non-empty line.' }
           $parts = $lines[0] -split '\s+', 2
@@ -123,3 +135,31 @@ jobs:
           $actualHash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actualHash -ne $expectedHash) { throw ('Release SHA-256 mismatch. Expected {0}, actual {1}.' -f $expectedHash, $actualHash) }
           Write-Host ('Release SHA-256 verified: {0}' -f $actualHash)
+
+      - name: Verify single-file entry actually runs
+        run: |
+          $result = & .\tools\New-NRSingleFileDistribution.ps1 -OutputDirectory .\dist-check -NoElevationManifest | ConvertFrom-Json
+          if (-not $result.Success) { throw ('Single-file distribution build failed: {0}' -f $result.ExecutableError) }
+          if (-not (Test-Path -LiteralPath $result.Executable)) { throw 'Executable entry was not produced.' }
+
+          $exeOutput = (& $result.Executable -Mode Version) -join ' '
+          if ($exeOutput -notmatch 'NetworkRepair v') { throw ('Unexpected executable output: {0}' -f $exeOutput) }
+
+          $scriptOutput = (& powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File $result.SingleScript -Mode Version) -join ' '
+          if ($scriptOutput -notmatch 'NetworkRepair v') { throw ('Unexpected single-file script output: {0}' -f $scriptOutput) }
+
+          Write-Host ('Executable entry output: {0}' -f $exeOutput)
+          Write-Host ('Single-file script output: {0}' -f $scriptOutput)
+
+      - name: Verify packaged entry names survive zip encoding
+        run: |
+          $zip = Get-ChildItem .\release-check\*.zip | Select-Object -First 1
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          try { $names = @($archive.Entries | ForEach-Object { ($_.FullName -replace '\\','/') }) } finally { $archive.Dispose() }
+
+          foreach ($expected in @('网络修复工具.exe','使用说明.md','备用启动/启动-网络修复工具.bat','NetworkRepair.single.ps1')) {
+            $matches = @($names | Where-Object { $_ -like ('*/' + $expected) })
+            if ($matches.Count -ne 1) { throw ('Packaged entry missing or duplicated after zip round-trip: {0}' -f $expected) }
+          }
+          Write-Host 'Packaged entry names verified.'
