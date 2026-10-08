@@ -73,6 +73,12 @@ JSON：
 NetworkRepair.bat -Mode Scan -Json
 ```
 
+导出脱敏诊断包（只读，不包含机器名、MAC、IP、NetworkId 或注册表备份）：
+
+```bat
+powershell.exe -ExecutionPolicy Bypass -File .\tools\Export-NRSanitizedDiagnosticBundle.ps1
+```
+
 跳过 Internet/DNS 测试：
 
 ```bat
