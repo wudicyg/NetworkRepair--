@@ -1,7 +1,8 @@
 ﻿[CmdletBinding()]
 param(
     [string]$OutputPath,
-    [switch]$SkipConnectivityTest
+    [switch]$SkipConnectivityTest,
+    [switch]$IncludeSensitiveDetails
 )
 
 Set-StrictMode -Version Latest
@@ -64,6 +65,17 @@ $evidence = [pscustomobject]@{
     DnsServers = @($diagnostics.DnsServers)
     NCSI = $diagnostics.NCSI
     IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
+}
+
+
+if ($IncludeSensitiveDetails) {
+    [void]$evidence.PSObject.Properties.Remove('Sanitized')
+    $evidence | Add-Member -NotePropertyName Sanitized -NotePropertyValue $false -Force
+    $evidence | Add-Member -NotePropertyName IncludesSensitiveDetails -NotePropertyValue $true -Force
+    Write-Warning '敏感详情模式会导出计算机名、Profile/接口名、NetworkId、注册表路径和 IP 配置。请只保存在本机安全位置，切勿公开上传。'
+} else {
+    $evidence = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+    $evidence | Add-Member -NotePropertyName EvidenceType -NotePropertyValue 'SanitizedReadOnlyValidation' -Force
 }
 
 if ($OutputPath) {
