@@ -182,10 +182,10 @@
         $diagnosticsPath = Join-Path $root 'src\Diagnostics.ps1'
         $diagnostics = Get-Content -LiteralPath $diagnosticsPath -Raw -Encoding UTF8
         $tool | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics'))
-        $diagnostics | Should -Match "\^网络\\s\+\\d\+\$"
-        $diagnostics | Should -Match "\^Network\\s\+\\d\+\$"
-        $diagnostics | Should -Match "\^\(网络\|Network\)\\s\+\\d\+\$"
-        $diagnostics | Should -Not -Match 'Network\\s\+d\+'
+        $diagnostics | Should -Match ([regex]::Escape("'^(网络|Network) +[0-9]+$'"))
+        $diagnostics | Should -Match ([regex]::Escape("'^网络 +[0-9]+$'"))
+        $diagnostics | Should -Match ([regex]::Escape("'^Network +[0-9]+$'"))
+        $diagnostics | Should -Not -Match 'Networks\+d\+'
         $diagnostics | Should -Not -Match '网络s\+d\+'
     }
 
