@@ -230,6 +230,8 @@
         $entry | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
         $entry | Should -Match ([regex]::Escape('-IncludeSensitiveDetails:$IncludeSensitiveDetails'))
         $diagnostics | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $d'))
+        $diagnostics | Should -Match ([regex]::Escape('Sanitized = $false'))
+        $diagnostics | Should -Match ([regex]::Escape('IncludesSensitiveDetails = $true'))
         $validation | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
         $validation | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics'))
         $validation | Should -Match 'SensitiveDetails'
