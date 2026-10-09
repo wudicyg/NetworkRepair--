@@ -1,7 +1,8 @@
 ﻿[CmdletBinding()]
 param(
     [string]$OutputPath,
-    [switch]$SkipConnectivityTest
+    [switch]$SkipConnectivityTest,
+    [switch]$IncludeSensitiveDetails
 )
 
 Set-StrictMode -Version Latest
@@ -35,35 +36,39 @@ $Script:LogFile = Join-Path $Script:Logs ('validation_{0}.log' -f (Get-Date -For
 
 $diagnostics = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
 
-$evidence = [pscustomobject]@{
-    SchemaVersion = '1.0'
-    ReadOnly = $true
-    GeneratedAt = (Get-Date).ToString('o')
-    ComputerName = $env:COMPUTERNAME
-    Application = $Script:AppName
-    ApplicationVersion = $Script:AppVersion
-    Windows = $diagnostics.Windows
-    NetworkHealth = $diagnostics.NetworkHealth
-    ProfileHygieneStatus = $diagnostics.ProfileHygieneStatus
-    RepairRecommendation = $diagnostics.RepairRecommendation
-    SafeCandidateCount = $diagnostics.SafeCandidateCount
-    HighRiskCount = $diagnostics.HighRiskCount
-    NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
-        $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
-    }).Count
-    CurrentConnections = @($diagnostics.Connections | Select-Object Name,InterfaceAlias,NetworkCategory,IPv4Connectivity,IPv6Connectivity)
-    Adapters = @($diagnostics.Adapters | Select-Object Name,InterfaceDescription,Status,LinkSpeed,MediaType,Virtual)
-    NetworkListManager = [pscustomobject]@{
-        Available = [bool]$diagnostics.NetworkListManager.Available
-        NetworkCount = if ($diagnostics.NetworkListManager.Available) { @($diagnostics.NetworkListManager.Networks).Count } else { 0 }
-        ExactNetworkIdCorrelationCount = @($diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
+if ($IncludeSensitiveDetails) {
+    Write-Warning '敏感详情模式已启用。证据可能包含计算机名、适配器/Profile 名称、MAC/IP 地址、NetworkId、注册表路径及探测细节；仅保存在本机，不要公开上传。'
+    $evidence = [pscustomobject]@{
+        SchemaVersion = '1.0'
+        EvidenceType = 'SensitiveReadOnlyValidation'
+        ReadOnly = $true
+        Sanitized = $false
+        GeneratedAt = (Get-Date).ToString('o')
+        ComputerName = $env:COMPUTERNAME
+        Application = $Script:AppName
+        ApplicationVersion = $Script:AppVersion
+        Windows = $diagnostics.Windows
+        NetworkHealth = $diagnostics.NetworkHealth
+        ProfileHygieneStatus = $diagnostics.ProfileHygieneStatus
+        RepairRecommendation = $diagnostics.RepairRecommendation
+        SafeCandidateCount = $diagnostics.SafeCandidateCount
+        HighRiskCount = $diagnostics.HighRiskCount
+        Candidates = @($diagnostics.Candidates)
+        Connections = @($diagnostics.Connections)
+        Adapters = @($diagnostics.Adapters)
+        NetworkListManager = $diagnostics.NetworkListManager
+        NetworkIdentityCorrelations = @($diagnostics.NetworkIdentityCorrelations)
+        RegistryProfiles = @($diagnostics.RegistryProfiles)
+        IPConfiguration = @($diagnostics.IPConfiguration)
+        Gateways = @($diagnostics.Gateways)
+        DnsServers = @($diagnostics.DnsServers)
+        NCSI = $diagnostics.NCSI
+        IssueDetails = @($diagnostics.IssueDetails)
+        DiagnosticsErrors = @($diagnostics.DiagnosticsErrors)
     }
-    Candidates = @($diagnostics.Candidates | Select-Object KeyName,ProfileName,Managed,IsActive,RiskScore,RiskLevel,RemediationAllowed,DiagnosticCodes,NetworkId,NetworkName,NetworkCorrelation,NlmIsConnected,Reason,LastWrite)
-    IPConfiguration = @($diagnostics.IPConfiguration | Select-Object InterfaceAlias,InterfaceIndex,IPv4Addresses,IPv6Addresses,IPv4Gateway,IPv4Dhcp,DnsServersIPv4)
-    Gateways = @($diagnostics.Gateways)
-    DnsServers = @($diagnostics.DnsServers)
-    NCSI = $diagnostics.NCSI
-    IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
+} else {
+    $evidence = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+    $evidence | Add-Member -NotePropertyName EvidenceType -NotePropertyValue 'SanitizedReadOnlyValidation'
 }
 
 if ($OutputPath) {
