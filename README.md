@@ -2,14 +2,14 @@
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
-> 当前稳定版本：**1.0.0**
+> 最新正式发行版：**1.4.0**
 >
-> `1.0.0` 为项目首个正式稳定版。核心 Safe Repair、历史编号 Profile 清理、Backup/Restore、诊断与回滚路径已完成收口，并已在真实 Windows 10 / PowerShell 5.1 环境完成核心行为验证。Windows 11 及更多语言/系统组合保留为后续兼容性扩展验证。
+> 当前 `main` 开发版本：**1.5.0-dev**。维护者已确认：所有已发布脚本版本及单文件 EXE 均已在真实 Windows 10 环境测试通过，Windows 10 验证矩阵已通过。当前支持声明以 Windows 10 + Windows PowerShell 5.1 为准；Windows 11 尚未实机验证，本阶段暂不纳入适配目标。
 
 > **项目定位**：专门解决 Windows 网络名称持续出现「网络 2 / 网络 3 / 网络 4 / …」等历史 Network Profile 累积问题。  
 > 在不破坏当前活动网络的前提下，先诊断、再备份、后清理并验证；同时提供 DNS、DHCP、网关、NCSI 等常见网络故障诊断与可回滚修复能力。
 
-当前主分支：**1.0.0**
+当前主分支开发版本：**1.5.0-dev**
 
 NetMedic 的目标不是“暴力清理注册表”，而是：
 
@@ -42,7 +42,7 @@ NetMedic 的核心任务不是“重置整个网络”，而是解决 Windows �
 - Profile GUID ↔ NetworkId 精确关联
 - 基于 Network List Manager 的显式网络重命名
 - 独立 Repair Planner：统一修复决策与真实执行计划
-- Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
+- Deep Repair 仅在网络状态需要调查或存在安全清理对象时可刷新 `NewNetworks`；健康网络且没有可安全清理的候选时不会进入破坏性路径
 - Restore 只导入 NetMedic 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
 - 多级恢复点：备份按 `Manual` / `PreRepair` / `PreRestore` 分级，可列举、按序号恢复、固定保护，并按保留额度显式清理
@@ -108,6 +108,15 @@ powershell.exe -ExecutionPolicy Bypass -File .\\tools\\New-NRReleasePackage.ps1
 
 发布包由带 `v` 前缀的版本 Tag 触发 GitHub Actions 自动构建，并生成 ZIP 与 SHA-256 校验文件。发布 Tag 必须与 `NetworkRepair.ps1` 中的版本完全一致。
 
+诊断报告默认输出**脱敏摘要**。只有显式添加 `-IncludeSensitiveDetails` 才会导出包含本机标识的完整诊断数据；完整报告只应保存在本机安全位置，不要上传到公开 Issue / PR。
+
+只读验收工具也默认导出脱敏摘要：
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\\tools\\Invoke-NRReadOnlyValidation.ps1 -OutputPath .\\validation\\machine.json
+```
+
+仅在私下排障、且确实需要接口名、Profile 名、NetworkId、注册表路径或 IP 地址时才添加 `-IncludeSensitiveDetails`。详细字段范围见 [隐私说明](docs/privacy.md)。
 跳过 Internet/DNS 测试：
 
 ```bat
@@ -117,24 +126,18 @@ NetworkRepair.bat -Mode Scan -SkipConnectivityTest
 
 ## 发布流程
 
-GitHub Release 不会因为合并到 `main` 自动产生；只有推送与 `NetworkRepair.ps1` 版本完全一致的 Tag 后，Release 工作流才会创建发行版。
+当前最新正式发行版为 `v1.4.0`；主线开发版本为 `1.5.0-dev`。不要重复创建已存在的旧 Tag，例如 `v1.0.0`。
 
-当前稳定版为：
-
-```text
-1.0.0
-```
-
-正式稳定版本 Tag：
+合并发布 PR 前，先同步更新 `NetworkRepair.ps1` 的 `$Script:AppVersion`、CHANGELOG 与 README。正式发布时，应用版本必须改成不带 `-dev` 等后缀的完整稳定版本，并推送同名 Tag；例如只有在源码版本已更新为 `1.5.0` 后，才执行：
 
 ```powershell
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.5.0
+git push origin v1.5.0
 ```
 
-发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本从 `1.1.0-dev` 开始。
+Release 工作流会校验 Tag 与应用版本、运行 Pester、构建 ZIP 与单文件 EXE、生成 SHA-256 并创建 GitHub Release。开发版 Tag（例如 `v1.5.0-dev`）会被标记为 Prerelease。
 
-Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。当前版本以 Windows 10 实机核心场景为主要行为证据，Windows 11 与更多环境组合属于后续扩展验证。
+当前 Windows 支持与验收声明以 Windows 10 / PowerShell 5.1 为准；维护者确认 Windows 10 矩阵及所有已发布脚本/单文件 EXE 已通过真实机器测试。Windows 11 尚未实测，本阶段不纳入适配目标，也不作为当前发布阻塞项。
 ## 安全模型
 
 ### Safe Repair
@@ -278,15 +281,18 @@ NetMedic_<版本>_Windows/
 
 ## 系统要求
 
-- Windows 10 / Windows 11
+- Windows 10（当前已验证环境）
 - Windows PowerShell 5.1
 - 管理员权限
+
+Windows 11 尚未实机验证，当前版本不声明已兼容 Windows 11。
 
 NetMedic 使用 Windows `NetConnection` 模块获取 Connection Profile，并以 Network List Manager 所提供的网络信息模型为设计依据。
 
 ## 开发文档
 
-- [Windows 10 / 11 发布验证](docs/release-validation.md)
+- [Windows 10 发布验证](docs/release-validation.md)
+- [隐私说明](docs/privacy.md)
 - [架构设计](docs/architecture.md)
 - [路线图](docs/roadmap.md)
 - [协作流程](docs/collaboration.md)
@@ -294,7 +300,7 @@ NetMedic 使用 Windows `NetConnection` 模块获取 Connection Profile，并以
 
 ## 项目路线
 
-当前 `main` 已包含 1.0.0 的 Repair Planner、scoped Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。1.0.0 的核心发布阻塞项已收口，后续重点转向更精细的恢复点、服务刷新与用户体验能力。
+当前 `main` 的开发基线为 `1.5.0-dev`，最新正式发行版为 `1.4.0`。核心安全修复、恢复点管理、按需服务刷新、WinForms GUI、单文件 EXE 与更新检查均已落地。后续重点转向隐私默认值、发布说明一致性与有明确价值的兼容性扩展；Windows 11 暂不纳入当前目标。
 
 ## License
 
