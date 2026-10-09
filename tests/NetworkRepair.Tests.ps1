@@ -185,6 +185,51 @@
         $content | Should -Not -Match "网络s\+d\+"
         $content | Should -Not -Match "Networks\+d\+"
     }
+    It 'sanitizes diagnostics without leaking local identifiers' {
+        $candidate=[pscustomobject]@{
+            ProfileName='Network 12';KeyName='SECRET-KEY';Managed=0;IsActive=$false;RiskScore=30;RiskLevel='Low';
+            RemediationAllowed=$true;DiagnosticCodes=@('NR1001');NetworkCorrelation='None';NlmIsConnected=$false;
+            NetworkId='SECRET-NETWORK-ID';NetworkName='PRIVATE-OFFICE';RegistryPath='HKLM:\\PRIVATE-PATH';
+        }
+        $diagnostics=[pscustomobject]@{
+            Timestamp='2026-10-09T00:00:00Z';
+            Windows=[pscustomobject]@{Caption='Windows 10 Pro';Version='10.0';Build='19045';Architecture='64-bit';PowerShell='5.1'};
+            NetworkHealth=[pscustomobject]@{Status='Healthy';OperationallyHealthy=$true;Reason='Connectivity confirmed';NCSIHealthy=$true;NCSIKnown=$true;InternetProfileCount=1};
+            ProfileHygieneStatus='HistoricalProfilesFound';RepairRecommendation='CleanHistoricalProfiles';SafeCandidateCount=1;HighRiskCount=0;
+            Candidates=@($candidate);
+            Connections=@([pscustomobject]@{Name='PRIVATE-OFFICE';InterfaceAlias='SECRET-WIFI';NetworkCategory='Private';IPv4Connectivity='Internet';IPv6Connectivity='NoTraffic'});
+            Adapters=@([pscustomobject]@{Name='SECRET-WIFI';InterfaceDescription='SECRET-ADAPTER';Status='Up';MacAddress='AA-BB-CC-DD-EE-FF';LinkSpeed='1 Gbps';MediaType='802.3';Virtual=$false});
+            NetworkListManager=[pscustomobject]@{Available=$true;Networks=@([pscustomobject]@{Name='PRIVATE-OFFICE'} )};
+            NetworkIdentityCorrelations=@([pscustomobject]@{Correlation='ExactNetworkId'});
+            IPConfiguration=@([pscustomobject]@{InterfaceAlias='SECRET-WIFI';IPv4Addresses=@('192.168.10.55');IPv6Addresses=@();IPv4Gateway=@('192.168.10.1');IPv4Dhcp='Enabled';IPv6Dhcp='Disabled';DnsServersIPv4=@('192.168.10.1');DnsServersIPv6=@()});
+            Gateways=@([pscustomobject]@{Gateway='192.168.10.1';Reachable=$true});
+            DnsServers=@([pscustomobject]@{Server='192.168.10.1';ResolvesNCSI=$true});
+            NCSI=[pscustomobject]@{Skipped=$false;Enabled=1;Dns=$true;Http=$true;DnsHost='private-dns-host';WebUrl='https://private-url.invalid'};
+            IssueDetails=@([pscustomobject]@{Code='NR1001';Severity='Low';Message='Private issue text'});
+            DiagnosticsErrors=@()
+        }
+        $summary=ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+        $summary.Sanitized | Should -BeTrue
+        $summary.NumberedProfileCount | Should -Be 1
+        $summary.Candidates[0].ProfileClass | Should -Be 'EnglishNumbered'
+        $json=$summary | ConvertTo-Json -Depth 12
+        foreach ($secret in @('SECRET-KEY','SECRET-NETWORK-ID','PRIVATE-OFFICE','SECRET-WIFI','SECRET-ADAPTER','192.168.10.55','192.168.10.1','AA-BB-CC-DD-EE-FF','HKLM:\\PRIVATE-PATH','private-url.invalid','Private issue text')) {
+            $json | Should -Not -Match ([regex]::Escape($secret))
+        }
+    }
+
+    It 'makes sensitive report export an explicit opt-in' {
+        $entryPath=Join-Path $root 'NetworkRepair.ps1'
+        $entry=Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $diagnostics=Get-Content -LiteralPath (Join-Path $root 'src\\Diagnostics.ps1') -Raw -Encoding UTF8
+        $validation=Get-Content -LiteralPath (Join-Path $root 'tools\\Invoke-NRReadOnlyValidation.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match '\\[switch\\]\\$IncludeSensitiveDetails'
+        $entry | Should -Match 'Export-NRReport .* -IncludeSensitiveDetails:\\$IncludeSensitiveDetails'
+        $diagnostics | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \\$d'
+        $validation | Should -Match '\\[switch\\]\\$IncludeSensitiveDetails'
+        $validation | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \\$diagnostics'
+        $validation | Should -Match 'SensitiveDetails'
+    }
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
     }
