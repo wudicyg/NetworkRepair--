@@ -176,14 +176,70 @@
         $entry | Should -Match '\$Script:AppVersion'
     }
 
-    It 'keeps sanitized bundle numbered profile regexes intact' {
+    It 'keeps sanitized bundle classification in the shared summary helper' {
         $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
-        $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
-        $content | Should -Match "\^网络\\s\+\\d\+\$"
-        $content | Should -Match "\^Network\\s\+\\d\+\$"
-        $content | Should -Match "\^\(网络\|Network\)\\s\+\\d\+\$"
-        $content | Should -Not -Match "网络s\+d\+"
-        $content | Should -Not -Match "Networks\+d\+"
+        $tool = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
+        $diagnosticsPath = Join-Path $root 'src\Diagnostics.ps1'
+        $diagnostics = Get-Content -LiteralPath $diagnosticsPath -Raw -Encoding UTF8
+        $tool | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics'))
+        $diagnostics | Should -Match ([regex]::Escape("'^(网络|Network) +[0-9]+$'"))
+        $diagnostics | Should -Match ([regex]::Escape("'^网络 +[0-9]+$'"))
+        $diagnostics | Should -Match ([regex]::Escape("'^Network +[0-9]+$'"))
+        $diagnostics | Should -Not -Match 'Networks\+d\+'
+        $diagnostics | Should -Not -Match '网络s\+d\+'
+    }
+
+    It 'sanitizes diagnostics without leaking local identifiers' {
+        $candidate=[pscustomobject]@{
+            ProfileName='Network 12';KeyName='SECRET-KEY';Managed=0;IsActive=$false;RiskScore=30;RiskLevel='Low';
+            RemediationAllowed=$true;DiagnosticCodes=@('NR1001');NetworkCorrelation='None';NlmIsConnected=$false;
+            NetworkId='SECRET-NETWORK-ID';NetworkName='PRIVATE-OFFICE';RegistryPath='HKLM:\\PRIVATE-PATH';
+        }
+        $diagnostics=[pscustomobject]@{
+            Timestamp='2026-10-09T00:00:00Z';
+            Windows=[pscustomobject]@{Caption='Windows 10 Pro';Version='10.0';Build='19045';Architecture='64-bit';PowerShell='5.1'};
+            NetworkHealth=[pscustomobject]@{Status='Healthy';OperationallyHealthy=$true;Reason='CANARY_HEALTH_REASON_123';NCSIHealthy=$true;NCSIKnown=$true;InternetProfileCount=1};
+            ProfileHygieneStatus='HistoricalProfilesFound';RepairRecommendation='CleanHistoricalProfiles';SafeCandidateCount=1;HighRiskCount=0;
+            Candidates=@($candidate);
+            Connections=@([pscustomobject]@{Name='PRIVATE-OFFICE';InterfaceAlias='SECRET-WIFI';NetworkCategory='Private';IPv4Connectivity='Internet';IPv6Connectivity='NoTraffic'});
+            Adapters=@([pscustomobject]@{Name='SECRET-WIFI';InterfaceDescription='SECRET-ADAPTER';Status='Up';MacAddress='AA-BB-CC-DD-EE-FF';LinkSpeed='1 Gbps';MediaType='802.3';Virtual=$false});
+            NetworkListManager=[pscustomobject]@{Available=$true;Networks=@([pscustomobject]@{Name='PRIVATE-OFFICE'} )};
+            NetworkIdentityCorrelations=@([pscustomobject]@{Correlation='ExactNetworkId'});
+            IPConfiguration=@([pscustomobject]@{InterfaceAlias='SECRET-WIFI';IPv4Addresses=@('192.168.10.55');IPv6Addresses=@();IPv4Gateway=@('192.168.10.1');IPv4Dhcp='Enabled';IPv6Dhcp='Disabled';DnsServersIPv4=@('192.168.10.1');DnsServersIPv6=@()});
+            Gateways=@([pscustomobject]@{Gateway='192.168.10.1';Reachable=$true});
+            DnsServers=@([pscustomobject]@{Server='192.168.10.1';ResolvesNCSI=$true});
+            NCSI=[pscustomobject]@{Skipped=$false;Enabled=1;Dns=$true;Http=$true;DnsHost='private-dns-host';WebUrl='https://private-url.invalid'};
+            IssueDetails=@([pscustomobject]@{Code='NR1001';Severity='Low';Message='Private issue text'});
+            DiagnosticsErrors=@()
+        }
+        $summary=ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+        $summary.Sanitized | Should -BeTrue
+        $summary.NumberedProfileCount | Should -Be 1
+        $summary.Candidates[0].ProfileClass | Should -Be 'EnglishNumbered'
+        $json=$summary | ConvertTo-Json -Depth 12
+        foreach ($secret in @('SECRET-KEY','SECRET-NETWORK-ID','PRIVATE-OFFICE','SECRET-WIFI','SECRET-ADAPTER','192.168.10.55','192.168.10.1','AA-BB-CC-DD-EE-FF','HKLM:\\PRIVATE-PATH','private-url.invalid','Private issue text','CANARY_HEALTH_REASON_123')) {
+            $json | Should -Not -Match ([regex]::Escape($secret))
+        }
+    }
+
+    It 'makes sensitive report export an explicit opt-in' {
+        $entryPath=Join-Path $root 'NetworkRepair.ps1'
+        $entry=Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
+        $diagnostics=Get-Content -LiteralPath (Join-Path $root 'src\Diagnostics.ps1') -Raw -Encoding UTF8
+        $validation=Get-Content -LiteralPath (Join-Path $root 'tools\Invoke-NRReadOnlyValidation.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
+        $entry | Should -Match ([regex]::Escape('-IncludeSensitiveDetails:$IncludeSensitiveDetails'))
+        $diagnostics | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $d'))
+        $diagnostics | Should -Match ([regex]::Escape('Sanitized = $false'))
+        $diagnostics | Should -Match ([regex]::Escape('IncludesSensitiveDetails = $true'))
+        $validation | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
+        $validation | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics'))
+        $validation | Should -Match 'SensitiveDetails'
+        $entry | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $r'))
+        $entry | Should -Match 'Scan JSON'
+        $entry | Should -Match ([regex]::Escape('Sanitized = $false'))
+        $diagnostics | Should -Not -Match 'NetworkHealth = \$Diagnostics\.NetworkHealth'
+        $diagnostics | Should -Not -Match 'DiagnosticCodes = @\(\$_\.DiagnosticCodes\)'
     }
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
@@ -987,6 +1043,14 @@
         $tool | Should -Match 'NoOutput'
         # 备用启动器必须显式回到控制台 TUI，否则控制台入口会消失。
         $tool | Should -Match ([regex]::Escape('-Mode Menu'))
+    }
+
+    It 'normalizes prerelease SemVer before embedding PE file version resources' {
+        $tool = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -Raw -Encoding UTF8
+        $tool | Should -Match 'function ConvertTo-NRFileVersion'
+        $tool | Should -Match ([regex]::Escape('$fileVersion = ConvertTo-NRFileVersion -Version $version'))
+        $tool | Should -Match ([regex]::Escape('Version     = $fileVersion'))
+        $tool | Should -Not -Match ([regex]::Escape('Version     = (''{0}.0'' -f $version)'))
     }
 
     It 'ships a valid multi-size application icon' {

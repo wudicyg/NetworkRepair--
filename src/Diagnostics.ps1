@@ -13,13 +13,63 @@ function Test-NRInternetConnectivity {
     [pscustomobject]@{Skipped=$false;DNS=$dnsOk;TCP443=$tcpOk}
 }
 function Invoke-NRScan { param([switch]$SkipConnectivityTest);Write-NRLog 'Starting diagnostic scan.';$d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;if(-not $Json){Show-NRDiagnostics -Diagnostics $d};Write-NRLog ('Diagnostic scan complete. SafeCandidates={0}, HighRisk={1}'-f $d.SafeCandidateCount,$d.HighRiskCount);$d }
-function Export-NRReport {
-    param([string]$Path,[switch]$SkipConnectivityTest)
-    if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
-    $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
-    Write-NRLog ('Diagnostic report exported: {0}'-f $Path);[pscustomobject]@{Success=$true;Path=$Path;Diagnostics=$d}
-}
+function ConvertTo-NRSanitizedDiagnosticSummary {
+    param([Parameter(Mandatory)]$Diagnostics)
 
+    $appName = 'NetMedic'
+    $appVersion = $null
+    $appNameVariable = Get-Variable -Name AppName -Scope Script -ErrorAction SilentlyContinue
+    $appVersionVariable = Get-Variable -Name AppVersion -Scope Script -ErrorAction SilentlyContinue
+    if ($appNameVariable -and $appNameVariable.Value) { $appName = [string]$appNameVariable.Value }
+    if ($appVersionVariable -and $appVersionVariable.Value) { $appVersion = [string]$appVersionVariable.Value }
+
+    [pscustomobject]@{
+        SchemaVersion = '1.0'; Sanitized = $true; ReadOnly = $true
+        GeneratedAt = if ($Diagnostics.Timestamp) { [string]$Diagnostics.Timestamp } else { (Get-Date).ToString('o') }
+        Application = $appName; ApplicationVersion = $appVersion
+        Windows = [pscustomobject]@{ Caption = [string]$Diagnostics.Windows.Caption; Version = [string]$Diagnostics.Windows.Version; Build = [string]$Diagnostics.Windows.Build; Architecture = [string]$Diagnostics.Windows.Architecture; PowerShell = [string]$Diagnostics.Windows.PowerShell }
+        NetworkHealth = [pscustomobject]@{
+            Status = if ([string]$Diagnostics.NetworkHealth.Status -in @('Healthy','Degraded','Disconnected','Unknown')) { [string]$Diagnostics.NetworkHealth.Status } else { 'Unknown' }
+            OperationallyHealthy = [bool]$Diagnostics.NetworkHealth.OperationallyHealthy
+            NCSIHealthy = [bool]$Diagnostics.NetworkHealth.NCSIHealthy
+            NCSIKnown = [bool]$Diagnostics.NetworkHealth.NCSIKnown
+            InternetProfileCount = [int]$Diagnostics.NetworkHealth.InternetProfileCount
+        }
+        ProfileHygieneStatus = [string]$Diagnostics.ProfileHygieneStatus; RepairRecommendation = [string]$Diagnostics.RepairRecommendation
+        SafeCandidateCount = [int]$Diagnostics.SafeCandidateCount; HighRiskCount = [int]$Diagnostics.HighRiskCount
+        NumberedProfileCount = @($Diagnostics.Candidates | Where-Object { $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network) +[0-9]+$' }).Count
+        CurrentConnections = @($Diagnostics.Connections | ForEach-Object { [pscustomobject]@{ NetworkCategory = $_.NetworkCategory; IPv4Connectivity = $_.IPv4Connectivity; IPv6Connectivity = $_.IPv6Connectivity } })
+        Adapters = @($Diagnostics.Adapters | ForEach-Object { [pscustomobject]@{ Status = $_.Status; LinkSpeed = $_.LinkSpeed; MediaType = $_.MediaType; Virtual = $_.Virtual } })
+        NetworkListManager = [pscustomobject]@{ Available = [bool]$Diagnostics.NetworkListManager.Available; NetworkCount = if ($Diagnostics.NetworkListManager.Available) { @($Diagnostics.NetworkListManager.Networks).Count } else { 0 }; ExactNetworkIdCorrelationCount = @($Diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count }
+        Candidates = @($Diagnostics.Candidates | ForEach-Object { [pscustomobject]@{ ProfileClass = if ($_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^网络 +[0-9]+$') { 'ChineseNumbered' } elseif ($_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^Network +[0-9]+$') { 'EnglishNumbered' } else { 'Other' }; Managed = [bool]$_.Managed; IsActive = [bool]$_.IsActive; RiskScore = $_.RiskScore; RiskLevel = $_.RiskLevel; RemediationAllowed = [bool]$_.RemediationAllowed; DiagnosticCodes = @($_.DiagnosticCodes | Where-Object { [string]$_ -match '^NR\d{4}$' }); NetworkCorrelation = [string]$_.NetworkCorrelation; NlmIsConnected = [bool]$_.NlmIsConnected } })
+        IPConfiguration = @($Diagnostics.IPConfiguration | ForEach-Object { [pscustomobject]@{ IPv4AddressCount = @($_.IPv4Addresses).Count; IPv6AddressCount = @($_.IPv6Addresses).Count; HasIPv4Gateway = @($_.IPv4Gateway).Count -gt 0; IPv4Dhcp = $_.IPv4Dhcp; IPv6Dhcp = $_.IPv6Dhcp; DnsServerIPv4Count = @($_.DnsServersIPv4).Count; DnsServerIPv6Count = @($_.DnsServersIPv6).Count } })
+        GatewayDiagnostics = [pscustomobject]@{ TestedCount = @($Diagnostics.Gateways).Count; FailedCount = @($Diagnostics.Gateways | Where-Object { -not $_.Reachable }).Count }
+        DnsDiagnostics = [pscustomobject]@{ TestedCount = @($Diagnostics.DnsServers).Count; FailedCount = @($Diagnostics.DnsServers | Where-Object { -not $_.ResolvesNCSI }).Count }
+        NCSI = [pscustomobject]@{ Skipped = [bool]$Diagnostics.NCSI.Skipped; Enabled = $Diagnostics.NCSI.Enabled; Dns = $Diagnostics.NCSI.Dns; Http = $Diagnostics.NCSI.Http }
+        IssueDetails = @($Diagnostics.IssueDetails | Select-Object Code,Severity); DiagnosticErrorCount = @($Diagnostics.DiagnosticsErrors).Count
+        Redaction = [pscustomobject]@{ ComputerName = $true; MacAddress = $true; IPAddress = $true; RegistryPath = $true; NetworkId = $true; NetworkName = $true; InterfaceAlias = $true; NetworkUrl = $true; Credentials = $true }
+    }
+}
+function Export-NRReport {
+    param([string]$Path,[switch]$SkipConnectivityTest,[switch]$IncludeSensitiveDetails)
+    if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
+    $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
+    if ($IncludeSensitiveDetails) {
+        $reportData = [pscustomobject]@{
+            SchemaVersion = '1.0'
+            Sanitized = $false
+            IncludesSensitiveDetails = $true
+            Warning = 'This report contains local identifiers. Keep it private; do not upload publicly.'
+            Diagnostics = $d
+        }
+        Write-NRLog 'Exporting a full diagnostic report containing sensitive local identifiers.' 'WARN'
+    } else {
+        $reportData = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $d
+    }
+    $reportData | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Path -Encoding UTF8
+    Write-NRLog ('Diagnostic report exported: {0}; Sanitized={1}' -f $Path,(-not [bool]$IncludeSensitiveDetails))
+    [pscustomobject]@{Success=$true;Path=$Path;Sanitized=(-not [bool]$IncludeSensitiveDetails);IncludesSensitiveDetails=[bool]$IncludeSensitiveDetails;Diagnostics=$reportData}
+}
 
 function Get-NRIPDiagnostics {
     $rows = @()

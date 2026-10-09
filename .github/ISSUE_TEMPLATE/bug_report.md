@@ -24,6 +24,6 @@ assignees: ""
 
 ## 诊断报告
 
-请优先附上脱敏后的 JSON 诊断报告或日志。
+请优先使用 NetMedic 的默认脱敏诊断报告或一键脱敏诊断 ZIP。请勿直接附上完整报告、原始验收 JSON、注册表备份或整份 logs 目录。只有维护者明确要求时，才通过私下渠道提供显式使用 `-IncludeSensitiveDetails` 生成的完整详情。
 
-> 请不要提交 Wi-Fi 密码、VPN 凭据、令牌、私钥或其他敏感信息。
+> 默认脱敏摘要仍可能暴露 Windows Build、时间或罕见环境组合。上传前请人工检查内容；不要提交 Wi-Fi 密码、VPN 凭据、令牌、私钥、IP / MAC、NetworkId、网络 Profile 名称或企业网络拓扑。完整敏感报告不得公开发布。

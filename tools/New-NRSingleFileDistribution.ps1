@@ -52,6 +52,21 @@ function Get-NRDistributionVersion {
     $match.Groups[1].Value
 }
 
+function ConvertTo-NRFileVersion {
+    param([Parameter(Mandatory)][string]$Version)
+
+    # AppVersion may be SemVer (for example 1.5.0-dev), but PE resource versions
+    # accept numeric components only. Keep the app version unchanged in the script/package
+    # and normalize only the Windows file/product version embedded by ps2exe.
+    $numericPart = ($Version -split '[-+]', 2)[0]
+    if ([string]::IsNullOrWhiteSpace($numericPart) -or $numericPart -notmatch '^\d+(\.\d+){0,3}$') {
+        throw ('无法把应用版本转换为合法的 Windows 文件版本：{0}' -f $Version)
+    }
+    $parts = @($numericPart.Split('.'))
+    while ($parts.Count -lt 4) { $parts += '0' }
+    ($parts -join '.')
+}
+
 function Merge-NRSingleFileScript {
     param(
         [Parameter(Mandatory)][string]$EntryPath,
@@ -202,6 +217,8 @@ function Test-NRExecutableEmbeddedManifest {
 
 $version = Get-NRDistributionVersion -EntryPath $entryPath
 Write-Verbose ('NetMedic version: {0}' -f $version)
+$fileVersion = ConvertTo-NRFileVersion -Version $version
+Write-Verbose ('Windows file version: {0}' -f $fileVersion)
 
 # 图标：默认取仓库里的 assets\NetMedic.ico；不存在就退回不带图标。
 $resolvedIconPath = $null
@@ -251,7 +268,7 @@ if (-not $SkipExecutable) {
             Title       = 'NetMedic'
             Description = 'Windows 网络配置诊断与修复工具'
             Product     = 'NetMedic'
-            Version     = ('{0}.0' -f $version)
+            Version     = $fileVersion
             Company     = $CompanyName
         }
         if (-not $NoElevationManifest) { $compileArguments.RequireAdmin = $true }

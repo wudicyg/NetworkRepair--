@@ -30,117 +30,12 @@ $Script:LogFile = Join-Path $Script:Logs ('support_{0}.log' -f (Get-Date -Format
 . (Join-Path $Src 'Ncsi.ps1')
 . (Join-Path $Src 'Diagnostics.ps1')
 
-function ConvertTo-NRSanitizedCandidate {
-    param([Parameter(Mandatory)]$Candidate)
-
-    $profileClass = 'Other'
-    if ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^网络\s+\d+$') {
-        $profileClass = 'ChineseNumbered'
-    } elseif ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^Network\s+\d+$') {
-        $profileClass = 'EnglishNumbered'
-    }
-
-    [pscustomobject]@{
-        ProfileClass = $profileClass
-        Managed = [bool]$Candidate.Managed
-        IsActive = [bool]$Candidate.IsActive
-        RiskScore = $Candidate.RiskScore
-        RiskLevel = $Candidate.RiskLevel
-        RemediationAllowed = [bool]$Candidate.RemediationAllowed
-        DiagnosticCodes = @($Candidate.DiagnosticCodes)
-        NetworkCorrelation = [string]$Candidate.NetworkCorrelation
-        NlmIsConnected = [bool]$Candidate.NlmIsConnected
-    }
-}
-
 function Export-NRSanitizedDiagnosticBundle {
     param([string]$Path)
 
     $diagnostics = Get-NRDiagnostics
 
-    $bundle = [pscustomobject]@{
-        SchemaVersion = '1.0'
-        Sanitized = $true
-        ReadOnly = $true
-        GeneratedAt = (Get-Date).ToString('o')
-        Application = $Script:AppName
-        ApplicationVersion = $Script:AppVersion
-        Windows = [pscustomobject]@{
-            Caption = [string]$diagnostics.Windows.Caption
-            Version = [string]$diagnostics.Windows.Version
-            Build = [string]$diagnostics.Windows.Build
-            Architecture = [string]$diagnostics.Windows.Architecture
-            PowerShell = [string]$diagnostics.Windows.PowerShell
-        }
-        NetworkHealth = $diagnostics.NetworkHealth
-        ProfileHygieneStatus = [string]$diagnostics.ProfileHygieneStatus
-        RepairRecommendation = [string]$diagnostics.RepairRecommendation
-        SafeCandidateCount = [int]$diagnostics.SafeCandidateCount
-        HighRiskCount = [int]$diagnostics.HighRiskCount
-        NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
-            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
-        }).Count
-        CurrentConnections = @($diagnostics.Connections | ForEach-Object {
-            [pscustomobject]@{
-                NetworkCategory = $_.NetworkCategory
-                IPv4Connectivity = $_.IPv4Connectivity
-                IPv6Connectivity = $_.IPv6Connectivity
-            }
-        })
-        Adapters = @($diagnostics.Adapters | ForEach-Object {
-            [pscustomobject]@{
-                Status = $_.Status
-                LinkSpeed = $_.LinkSpeed
-                MediaType = $_.MediaType
-                Virtual = $_.Virtual
-            }
-        })
-        NetworkListManager = [pscustomobject]@{
-            Available = [bool]$diagnostics.NetworkListManager.Available
-            NetworkCount = if ($diagnostics.NetworkListManager.Available) { @($diagnostics.NetworkListManager.Networks).Count } else { 0 }
-            ExactNetworkIdCorrelationCount = @($diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
-        }
-        Candidates = @($diagnostics.Candidates | ForEach-Object {
-            ConvertTo-NRSanitizedCandidate -Candidate $_
-        })
-        IPConfiguration = @($diagnostics.IPConfiguration | ForEach-Object {
-            [pscustomobject]@{
-                InterfaceIndex = $_.InterfaceIndex
-                IPv4AddressCount = @($_.IPv4Addresses).Count
-                IPv6AddressCount = @($_.IPv6Addresses).Count
-                HasIPv4Gateway = @($_.IPv4Gateway).Count -gt 0
-                IPv4Dhcp = $_.IPv4Dhcp
-                IPv6Dhcp = $_.IPv6Dhcp
-                DnsServerIPv4Count = @($_.DnsServersIPv4).Count
-                DnsServerIPv6Count = @($_.DnsServersIPv6).Count
-            }
-        })
-        GatewayDiagnostics = [pscustomobject]@{
-            TestedCount = @($diagnostics.Gateways).Count
-            FailedCount = @($diagnostics.Gateways | Where-Object { -not $_.Reachable }).Count
-        }
-        DnsDiagnostics = [pscustomobject]@{
-            TestedCount = @($diagnostics.DnsServers).Count
-            FailedCount = @($diagnostics.DnsServers | Where-Object { -not $_.ResolvesNCSI }).Count
-        }
-        NCSI = [pscustomobject]@{
-            Skipped = [bool]$diagnostics.NCSI.Skipped
-            Enabled = $diagnostics.NCSI.Enabled
-            Dns = $diagnostics.NCSI.Dns
-            Http = $diagnostics.NCSI.Http
-        }
-        IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
-        DiagnosticErrorCount = @($diagnostics.DiagnosticsErrors).Count
-        Redaction = [pscustomobject]@{
-            ComputerName = $true
-            MacAddress = $true
-            IPAddress = $true
-            RegistryPath = $true
-            NetworkId = $true
-            NetworkUrl = $true
-            Credentials = $true
-        }
-    }
+    $bundle = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
 
     $json = $bundle | ConvertTo-Json -Depth 12
     if (-not $Path) {

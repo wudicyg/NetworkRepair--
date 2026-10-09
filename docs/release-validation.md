@@ -1,6 +1,6 @@
-﻿# 1.0.0 Release Validation
+﻿# Windows 10 Release Validation
 
-NetMedic 的 CI 负责脚本语法、Pester 与发布包回归；1.0.0 的核心行为验收以 Windows 10 PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows Build 与语言环境作为后续扩展兼容性验证，不阻塞 1.0.0。
+NetMedic 的 CI 负责脚本语法、Pester、单文件 EXE 构建与发布包回归。维护者确认：Windows 10 实机验证矩阵已通过，所有已发布脚本版本与封装单文件 EXE（截至 `v1.4.0`）均已在真实 Windows 10 环境测试通过。Windows 11 当前没有可用实机，故暂缓适配与矩阵测试；不把 Windows 11 当作当前支持承诺，也不作为本阶段发布阻塞项。
 
 ## 只读证据采集
 
@@ -16,24 +16,24 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation
 powershell.exe -ExecutionPolicy Bypass -File .\tools\Invoke-NRReadOnlyValidation.ps1 -SkipConnectivityTest -OutputPath .\validation\machine.json
 ```
 
-该工具只读取系统状态，不执行 Repair、Deep Repair、Rename、Restore、服务重启或注册表写入。输出会省略 MAC 地址等与验收无关的信息。
+该工具只读取系统状态，不执行 Repair、Deep Repair、Rename、Restore、服务重启或注册表写入。默认输出为脱敏摘要，会省略计算机名、适配器/接口名、具体 Profile 名、MAC、IP、NetworkId、注册表路径及原始网络标识。
+
+如确有需要在私下排障时查看完整字段，可显式添加 `-IncludeSensitiveDetails`。此模式会导出机器名、Profile/接口名、NetworkId、注册表路径和 IP 配置等敏感内容，只应保存在本机安全位置，绝不能公开上传。报告/诊断 ZIP 的脱敏规则见[隐私说明](privacy.md)。
 
 ## 核心验证矩阵
 
-| 场景 | 期望 |
+| 场景 | 当前结论 |
 | --- | --- |
-| 正常 Internet，且无编号历史 Profile | `NetworkHealth=Healthy`，`RepairRecommendation=NoAction`，不进入修改路径 |
-| 正常 Internet，存在非活动 `网络 2/3/4` 或 `Network 2/3/4` | `NetworkHealth=Healthy`，仍识别为历史 Profile，并生成清理计划 |
-| 正常 Internet，但编号 Profile 为当前活动连接 | 不允许自动删除 |
-| 正常 Internet，但编号 Profile 为 Managed | 不允许自动删除 |
-| Windows 10 + PowerShell 5.1 | 读取与 Safe Repair 回归通过 |
-| Windows 11 + PowerShell 5.1 | 后续扩展验证，不阻塞 1.0.0 |
-| DHCP IPv4 | 修复前后 IPv4、默认网关、DNS 正常 |
-| 静态 IPv4 | 修复前后 IPv4、默认网关、DNS 保持 |
-| Deep Repair | 只验证 `NewNetworks` 范围，不触碰 Signatures 无差别清理 |
-| Rename | 显式 NetworkId 修改后名称与原意一致，失败可回滚 |
-| Restore | 只恢复 NetMedic 管理的 `Profiles` / `NewNetworks`；恢复后各 scoped 快照匹配；失败时仅回滚到 Restore 前安全备份 |
-| 中文/英文系统 | 当前以中文 Windows 10 的 `网络 N` 实机验证为主要证据；英文环境后续扩展验证 |
+| Windows 10 + PowerShell 5.1 | ✅ 实机验证通过（维护者确认） |
+| 已发布脚本与单文件 EXE（截至 `v1.4.0`） | ✅ 全部已在真实 Windows 10 环境测试通过（维护者确认） |
+| 正常 Internet、无编号历史 Profile | ✅ 验证为 `Healthy` + `NoAction`，不进入修改路径 |
+| 正常 Internet + 非活动 `网络 2/3/4` / `Network 2/3/4` | ✅ 识别历史项并生成安全清理计划 |
+| 活动或 Managed 编号 Profile | ✅ 受保护，不允许自动删除 |
+| DHCP IPv4 / 静态 IPv4 | ✅ Windows 10 验证矩阵通过 |
+| Safe Repair / Deep Repair | ✅ Windows 10 验证矩阵通过；Deep Repair 限定于允许的 `NewNetworks` 范围 |
+| Rename / Backup / Restore / 失败回滚 | ✅ Windows 10 验证矩阵通过 |
+| Windows 11 | ⏸ 暂缓；当前没有 Windows 11 实机，未声明已验证或兼容，不阻塞当前 Windows 10 发布 |
+| 英文 Windows / 更多 Windows Build | ⏸ 暂缓扩展测试；不与已通过的 Windows 10 矩阵混为一谈 |
 
 ### Restore 证据要求
 
@@ -51,7 +51,7 @@ Restore 不应以完整 `NetworkList.reg` 导入成功作为验收标准。测�
 
 ### 1. 基线
 
-先运行只读证据采集器，保存 `machine.json`。
+先运行只读证据采集器，保存默认脱敏的 `machine.json`。如需要原始标识信息，仅在本机使用 `-IncludeSensitiveDetails`，不得把该文件公开上传。
 
 记录 Windows Build、PowerShell、网卡介质、当前连接、NetworkHealth、编号 Profile 数量。
 
@@ -126,6 +126,8 @@ ProtectedNumberedProfilesPresent
 
 不要把 Wi-Fi 密码、VPN 凭据或其他秘密数据上传到 Issue。
 
-## 1.0.0 发布验收结论
+## 当前发布验收结论（最新正式版 v1.4.0）
 
-当前 1.0.0 的核心目标是安全识别并清理非活动、非 Managed 的 `网络 N` / `Network N` 历史 Profile。该路径已经在真实 Windows 10 / PowerShell 5.1 环境完成实际运行验证。Windows 11 与更多环境组合继续保留测试入口，但不再作为 1.0.0 的发布阻塞项。
+维护者确认：Windows 10 + PowerShell 5.1 验证矩阵已通过，所有已发布脚本版本和单文件 EXE（截至 `v1.4.0`）均已在真实 Windows 10 环境完成测试。CI 同时覆盖 PowerShell 5.1、PowerShell 7、Pester、单文件 EXE 启动自检与发布包校验。
+
+Windows 11 当前没有可用实机，因此不宣称已经测试、适配或兼容；本阶段不继续投入 Windows 11 适配/矩阵，待获得对应测试环境后再单独规划。
