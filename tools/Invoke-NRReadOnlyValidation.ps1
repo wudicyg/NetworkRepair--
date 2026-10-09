@@ -36,6 +36,7 @@ $Script:LogFile = Join-Path $Script:Logs ('validation_{0}.log' -f (Get-Date -For
 
 $diagnostics = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
 
+if ($IncludeSensitiveDetails) {
 $evidence = [pscustomobject]@{
     SchemaVersion = '1.0'
     ReadOnly = $true
@@ -70,6 +71,13 @@ $evidence = [pscustomobject]@{
 
 if ($IncludeSensitiveDetails) {
     [void]$evidence.PSObject.Properties.Remove('Sanitized')
+    $evidence | Add-Member -NotePropertyName Sanitized -NotePropertyValue $false -Force
+    $evidence | Add-Member -NotePropertyName IncludesSensitiveDetails -NotePropertyValue $true -Force
+    Write-Warning '敏感详情模式会导出计算机名、Profile/接口名、NetworkId、注册表路径和 IP 配置。请只保存在本机安全位置，切勿公开上传。'
+} else {
+    $evidence = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+    $evidence | Add-Member -NotePropertyName EvidenceType -NotePropertyValue 'SanitizedReadOnlyValidation' -Force
+}
     $evidence | Add-Member -NotePropertyName Sanitized -NotePropertyValue $false -Force
     $evidence | Add-Member -NotePropertyName IncludesSensitiveDetails -NotePropertyValue $true -Force
     Write-Warning '敏感详情模式会导出计算机名、Profile/接口名、NetworkId、注册表路径和 IP 配置。请只保存在本机安全位置，切勿公开上传。'
