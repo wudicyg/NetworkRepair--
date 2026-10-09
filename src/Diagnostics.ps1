@@ -43,7 +43,7 @@ function ConvertTo-NRSanitizedDiagnosticSummary {
         SafeCandidateCount = [int]$Diagnostics.SafeCandidateCount
         HighRiskCount = [int]$Diagnostics.HighRiskCount
         NumberedProfileCount = @($Diagnostics.Candidates | Where-Object {
-            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+
+            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network) +[0-9]+
     param([string]$Path,[switch]$SkipConnectivityTest)
     if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
     $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
@@ -477,7 +477,7 @@ function Show-NRDiagnostics {
         }
         Candidates = @($Diagnostics.Candidates | ForEach-Object {
             [pscustomobject]@{
-                ProfileClass = if ($_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^网络\s+\d+
+                ProfileClass = if ($_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^网络 +[0-9]+
     param([string]$Path,[switch]$SkipConnectivityTest)
     if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
     $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
@@ -887,7 +887,7 @@ function Show-NRDiagnostics {
         }
     }
 }
-) { 'ChineseNumbered' } elseif ($_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^Network\s+\d+
+) { 'ChineseNumbered' } elseif ($_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^Network +[0-9]+
     param([string]$Path,[switch]$SkipConnectivityTest)
     if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
     $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
@@ -1348,6 +1348,7 @@ function Show-NRDiagnostics {
         }
     }
 }
+
 function Export-NRReport {
     param([string]$Path,[switch]$SkipConnectivityTest,[switch]$IncludeSensitiveDetails)
     if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
@@ -1361,6 +1362,11 @@ function Export-NRReport {
     $reportData | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Path -Encoding UTF8
     Write-NRLog ('Diagnostic report exported: {0}; Sanitized={1}' -f $Path,(-not [bool]$IncludeSensitiveDetails))
     [pscustomobject]@{Success=$true;Path=$Path;Sanitized=(-not [bool]$IncludeSensitiveDetails);IncludesSensitiveDetails=[bool]$IncludeSensitiveDetails;Diagnostics=$reportData}
+}
+    param([string]$Path,[switch]$SkipConnectivityTest)
+    if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
+    $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
+    Write-NRLog ('Diagnostic report exported: {0}'-f $Path);[pscustomobject]@{Success=$true;Path=$Path;Diagnostics=$d}
 }
 
 
