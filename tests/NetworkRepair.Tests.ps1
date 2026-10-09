@@ -52,6 +52,40 @@
             }
             $path
         }
+        function New-TestPrivacyDiagnostics {
+            $canary = 'PRIVACY-CANARY-5f6b8'
+            [pscustomobject]@{
+                Timestamp = '2026-10-09T12:34:56.0000000+08:00'
+                Windows = [pscustomobject]@{ Caption='Windows 10 Pro'; Version='10.0.19045'; Build='19045'; Architecture='64-bit'; PowerShell='5.1.19041.6456'; ComputerName=$canary }
+                NetworkHealth = [pscustomobject]@{ Status='Healthy'; Reason=$canary; Error=$canary }
+                ProfileHygieneStatus = 'HistoricalProfilesFound'
+                RepairRecommendation = 'CleanHistoricalProfiles'
+                SafeCandidateCount = 1
+                HighRiskCount = 0
+                Connections = @([pscustomobject]@{ Name=$canary; InterfaceAlias=$canary; IPv4Connectivity='Internet'; IPv6Connectivity='NoTraffic' })
+                Adapters = @([pscustomobject]@{ Name=$canary; InterfaceDescription=$canary; MacAddress='AA-BB-CC-DD-EE-FF'; Status='Up'; LinkSpeed='1 Gbps'; MediaType='802.3'; Virtual=$false })
+                NetworkListManager = [pscustomobject]@{ Available=$true; Networks=@([pscustomobject]@{ NetworkId=$canary; Name=$canary; IsConnected=$true }) }
+                NetworkIdentityCorrelations = @([pscustomobject]@{ NetworkId=$canary; NetworkName=$canary; Correlation='ExactNetworkId' })
+                RegistryProfiles = @([pscustomobject]@{ KeyName=$canary; ProfileName=$canary; RegistryPath="HKLM:\Software\$canary" })
+                Candidates = @([pscustomobject]@{
+                    KeyName=$canary; ProfileName='网络 9'; Managed=$false; IsActive=$false
+                    RiskScore=12; RiskLevel='Low'; RemediationAllowed=$true
+                    DiagnosticCodes=@('NR1001'); NetworkId=$canary; NetworkName=$canary
+                    NetworkCorrelation='ExactNetworkId'; NlmIsConnected=$false
+                    Reason=$canary; LastWrite=$canary
+                })
+                IPConfiguration = @([pscustomobject]@{
+                    InterfaceAlias=$canary; InterfaceIndex=42; IPv4Addresses=@('192.0.2.99')
+                    IPv6Addresses=@('2001:db8::99'); IPv4Gateway=@('192.0.2.1')
+                    IPv4Dhcp=$true; DnsServersIPv4=@('192.0.2.53'); DnsServersIPv6=@('2001:db8::53')
+                })
+                Gateways = @([pscustomobject]@{ Gateway='192.0.2.1'; Reachable=$false; Error=$canary })
+                DnsServers = @([pscustomobject]@{ Server='192.0.2.53'; ResolvesNCSI=$false; Error=$canary })
+                NCSI = [pscustomobject]@{ Skipped=$false; Enabled=1; Dns=$true; Http=$true; WebUrl=$canary; DnsHost=$canary; DnsError=$canary; HttpError=$canary }
+                IssueDetails = @([pscustomobject]@{ Code='NR1001'; Severity='Low'; Message=$canary })
+                DiagnosticsErrors = @($canary)
+            }
+        }
     }
 
     It 'returns null for missing optional registry properties' {
@@ -176,14 +210,12 @@
         $entry | Should -Match '\$Script:AppVersion'
     }
 
-    It 'keeps sanitized bundle numbered profile regexes intact' {
-        $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
-        $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
-        $content | Should -Match "\^网络\\s\+\\d\+\$"
-        $content | Should -Match "\^Network\\s\+\\d\+\$"
-        $content | Should -Match "\^\(网络\|Network\)\\s\+\\d\+\$"
-        $content | Should -Not -Match "网络s\+d\+"
-        $content | Should -Not -Match "Networks\+d\+"
+    It 'keeps numbered profile classification in the shared sanitizer' {
+        $diagnosticsPath = Join-Path $root 'src\Diagnostics.ps1'
+        $content = Get-Content -LiteralPath $diagnosticsPath -Raw -Encoding UTF8
+        $content.Contains('if ($profileName -match ''^网络\s+\d+$'')') | Should -BeTrue
+        $content.Contains('elseif ($profileName -match ''^Network\s+\d+$'')') | Should -BeTrue
+        $content | Should -Match 'function ConvertTo-NRSanitizedDiagnosticSummary\s*\{'
     }
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
@@ -1155,4 +1187,81 @@
         # SystemDefault 不能被改写成「仅 TLS 1.2」，否则现代系统上反而更容易失败
         $update | Should -Match 'SystemDefault'
     }
+
+    It 'redacts sensitive fields through the shared allowlist summary' {
+        $diagnostics = New-TestPrivacyDiagnostics
+        $summary = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+        $json = $summary | ConvertTo-Json -Depth 12
+
+        $summary.Sanitized | Should -BeTrue
+        $summary.ReadOnly | Should -BeTrue
+        $summary.Candidates[0].ProfileClass | Should -Be 'ChineseNumbered'
+        $summary.NumberedProfileCount | Should -Be 1
+        $summary.CurrentConnectionCount | Should -Be 1
+        $summary.AdapterCount | Should -Be 1
+        $summary.IPConfigurationSummary.IPv4AddressCount | Should -Be 1
+        $summary.NetworkListManager.ExactNetworkIdCorrelationCount | Should -Be 1
+        $json | Should -Not -Match 'PRIVACY-CANARY-5f6b8'
+        $json | Should -Not -Match '192\.0\.2\.99'
+        $json | Should -Not -Match '192\.0\.2\.53'
+        $json | Should -Not -Match 'AA-BB-CC-DD-EE-FF'
+        $json | Should -Not -Match '2001:db8::99'
+        $json | Should -Not -Match '192\.0\.2\.1'
+        $json | Should -Not -Match 'RegistryPath|NetworkId|InterfaceAlias|MacAddress|ProfileName'
+    }
+
+    It 'exports sanitized diagnostic reports by default' {
+        $path = Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_privacy_{0}.json' -f [guid]::NewGuid().ToString('N'))
+        $logPath = Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_privacy_{0}.log' -f [guid]::NewGuid().ToString('N'))
+        $oldLog = Get-Variable -Name LogFile -Scope Script -ErrorAction SilentlyContinue
+        $oldLogValue = if ($oldLog) { [string]$oldLog.Value } else { $null }
+        $Script:LogFile = $logPath
+        try {
+            Mock -CommandName Get-NRDiagnostics -MockWith { New-TestPrivacyDiagnostics }
+            $result = Export-NRReport -Path $path -SkipConnectivityTest
+            $report = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+            $result.Sanitized | Should -BeTrue
+            $report | Should -Match '"Sanitized":\s+true'
+            $report | Should -Not -Match 'PRIVACY-CANARY-5f6b8'
+            $report | Should -Not -Match '192\.0\.2\.99'
+        } finally {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+            if ($oldLogValue) { $Script:LogFile = $oldLogValue } else { Remove-Variable -Name LogFile -Scope Script -ErrorAction SilentlyContinue }
+        }
+    }
+
+    It 'exports raw diagnostic details only with explicit sensitive opt-in' {
+        $path = Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_sensitive_{0}.json' -f [guid]::NewGuid().ToString('N'))
+        $logPath = Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_sensitive_{0}.log' -f [guid]::NewGuid().ToString('N'))
+        $oldLog = Get-Variable -Name LogFile -Scope Script -ErrorAction SilentlyContinue
+        $oldLogValue = if ($oldLog) { [string]$oldLog.Value } else { $null }
+        $Script:LogFile = $logPath
+        try {
+            Mock -CommandName Get-NRDiagnostics -MockWith { New-TestPrivacyDiagnostics }
+            $result = Export-NRReport -Path $path -SkipConnectivityTest -IncludeSensitiveDetails
+            $report = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+            $result.Sanitized | Should -BeFalse
+            $report | Should -Match 'PRIVACY-CANARY-5f6b8'
+            $report | Should -Match '192\.0\.2\.99'
+        } finally {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+            if ($oldLogValue) { $Script:LogFile = $oldLogValue } else { Remove-Variable -Name LogFile -Scope Script -ErrorAction SilentlyContinue }
+        }
+    }
+
+    It 'uses sanitized diagnostic outputs by default and exposes explicit opt-in' {
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match '\[switch\]\$IncludeSensitiveDetails'
+        $entry | Should -Match '1\.5\.0-dev'
+        $entry | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \$r'
+        $entry | Should -Match 'Export-NRReport.*IncludeSensitiveDetails'
+        $validation = Get-Content -LiteralPath (Join-Path $root 'tools\Invoke-NRReadOnlyValidation.ps1') -Raw -Encoding UTF8
+        $validation | Should -Match '\[switch\]IncludeSensitiveDetails'
+        $validation | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \$diagnostics'
+        $bundle = Get-Content -LiteralPath (Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1') -Raw -Encoding UTF8
+        $bundle | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \$diagnostics'
+    }
+
 }
