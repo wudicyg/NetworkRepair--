@@ -51,6 +51,7 @@ $Script:Reports = Join-Path $Script:Root 'reports'
 . (Join-Path $Script:Src 'Repair.ps1')
 . (Join-Path $Script:Src 'Validation.ps1')
 . (Join-Path $Script:Src 'Update.ps1')
+. (Join-Path $Script:Src 'SanitizedReport.ps1')
 . (Join-Path $Script:Src 'Gui.ps1')
 Initialize-NRPaths
 $Script:LogFile = New-NRLogFile
@@ -151,7 +152,15 @@ function Invoke-NRMenu {
                 }
                 Pause-NR
             }
-            '6' { $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
+            '6' {
+                # 菜单里的导出走的是完整报告（含 MAC / IP / NetworkId），必须给出警告，
+                # 否则用户会把它直接贴进公开 Issue。需要公开发布请用脱敏诊断包。
+                $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest
+                Write-NRLine ('报告：{0}' -f $r.Path) 'Green'
+                Write-NRLine '注意：该报告是完整诊断数据（含 MAC 地址、IP 地址与 NetworkId），请勿直接公开分享。' 'Yellow'
+                Write-NRLine '需要公开发布请用脱敏诊断包：tools\Export-NRSanitizedDiagnosticBundle.ps1' 'Yellow'
+                Pause-NR
+            }
             '7' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
             '0' { return 0 }
             default { Write-NRLine '无效选择。' 'Yellow'; Start-Sleep -Milliseconds 700 }
@@ -202,7 +211,18 @@ try {
         'Restore' { if (-not $BackupPath -and $RestorePointIndex -le 0) { throw 'Restore 模式必须提供 -BackupPath 或 -RestorePointIndex。' }; $r = Restore-NRBackup -BackupPath $BackupPath -RestorePointIndex $RestorePointIndex -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 6 } }
         'RestorePoints' { $r = Get-NRRestorePointSummary; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Show-NRRestorePointList -RestorePoints $r.Points; Write-NRLine ('恢复点总数 {0}，超出保留额度 {1} 个。' -f $r.Total, $r.PruneCandidates) 'DarkGray' } }
         'Prune' { $plan = Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints); Show-NRRestorePointPlan -Plan $plan; $r = Invoke-NRRestorePointPrune -Plan $plan -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine $r.Message 'Green' }; if (-not $r.Success) { exit 8 } }
-        'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
+        'Report' {
+            # 完整诊断报告包含 MAC / IP / NetworkId，不能直接公开分享；这里必须明确警告，
+            # 否则用户会照着文档把敏感信息贴进公开 Issue。需要公开发布请用脱敏诊断包。
+            $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest
+            if ($Json) {
+                $r | ConvertTo-Json -Depth 8
+            } else {
+                Write-NRLine ('报告：{0}' -f $r.Path) 'Green'
+                Write-NRLine '注意：该报告是完整诊断数据，包含 MAC 地址、IP 地址与 NetworkId，请勿直接公开分享。' 'Yellow'
+                Write-NRLine '需要公开发布时请改用脱敏诊断包：tools\Export-NRSanitizedDiagnosticBundle.ps1' 'Yellow'
+            }
+        }
         'Gui' { Show-NRGui }
     }
     exit 0

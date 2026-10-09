@@ -7,13 +7,15 @@
     产出：
       <输出目录>\NetMedic_<版本>_Windows\          发布包目录
         ├─ 网络医生.exe                              单文件主程序（默认带提权清单）
-        ├─ 网络医生_<版本>.exe                       便携版副本，便于单独分发
-        ├─ 使用说明.md                                   面向普通用户的中文说明
+        ├─ 使用说明.md                               面向普通用户的中文说明
         ├─ 备用启动\启动-网络医生.bat                备用启动器
-        ├─ NetworkRepair.single.ps1                      压平后的单文件脚本
-        └─ 源码与文档（NetworkRepair.ps1 / src / tools / docs / ...）
+        ├─ NetworkRepair.single.ps1                  压平后的单文件脚本
+        ├─ RELEASE-MANIFEST.txt                      版本、入口、提权状态与内联模块数
+        └─ 源码与文档（NetworkRepair.ps1 / src / tools / docs / assets / ...）
       <输出目录>\NetMedic_<版本>_Windows.zip        发布包压缩文件（UTF-8 中文名）
-      <输出目录>\*.sha256                                对应的 SHA-256 校验文件
+      <输出目录>\NetMedic-<版本>-Portable.exe       便携版副本（与 zip 同级，**不在包内**；
+                                                    可用 -PortableExecutableName 覆盖）
+      <输出目录>\*.sha256                            上面两个产物各自的 SHA-256 校验文件
 
 .NOTES
     压缩使用 ZipFile + UTF-8 条目名，避免中文文件名在解压后变成乱码。

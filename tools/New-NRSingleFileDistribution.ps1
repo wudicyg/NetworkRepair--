@@ -4,13 +4,18 @@
     把 NetMedic 封装成面向普通用户的单文件分发：压平成单个脚本，并编译成可直接双击的 exe。
 
 .DESCRIPTION
-    产出内容：
-      NetworkRepair.single.ps1   压平后的单文件脚本（内容与 exe 相同，便于审计与排障）
-      网络医生.exe            单文件可执行程序（默认带 requireAdministrator 清单）
-      启动-网络医生.bat       备用启动器（纯 ASCII 内容，用于 exe 被安全软件拦截的情况）
+    产出内容（默认输出目录 dist\）：
+      NetworkRepair.single.ps1         压平后的单文件脚本（内容与 exe 相同，便于审计与排障）
+      网络医生.exe                     单文件可执行程序（默认带 requireAdministrator 清单）
+      备用启动\启动-网络医生.bat       备用启动器（纯 ASCII 内容，显式以 -Mode Menu 进入控制台 TUI）
 
     压平规则：把 NetworkRepair.ps1 中的 `. (Join-Path $Script:Src 'X.ps1')` 行替换为对应模块内容，
-    语义与逐文件点源完全一致，但分发时不再依赖 src/ 目录。
+    语义与逐文件点源完全一致，但分发时不再依赖 src/ 目录；同时把入口的默认模式改写为 -DefaultMode
+    （默认 Gui，即双击直接进图形界面）。
+
+    编译参数：窗口化编译（不给 -Console）会加 -noConsole -STA -DPIAware，并**必须同时加 -noOutput**——
+    ps2exe 在无控制台模式下会把脚本输出收集进一个模态对话框，不加则进程卡住（实测过）。
+    图标默认取 assets\NetMedic.ico，通过 ps2exe 的 -iconFile 嵌入 exe。
 
 .NOTES
     编译 exe 需要 ps2exe 模块与 .NET Framework 的 csc.exe。没有 ps2exe 时可加 -SkipExecutable

@@ -5,6 +5,17 @@ logs/*
 !logs/.gitkeep
 reports/*
 !reports/.gitkeep
+
+# Build output
+dist/
+dist-console/
+dist-gui/
+release/
+release-check/
+validation/
+icon-preview.png
+RELEASE-NOTES.md
+
 *.tmp
 *.bak
 *.user

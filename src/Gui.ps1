@@ -564,10 +564,19 @@ function Invoke-NRGuiBackup {
 }
 
 function Invoke-NRGuiExportReport {
-    Write-NRGuiLog -Message '正在导出脱敏诊断报告…' -Kind 'Head'
-    $report = Export-NRReport -SkipConnectivityTest
-    Write-NRGuiLog -Message ('报告已导出：{0}' -f $report.Path) -Kind 'Ok'
-    [void][System.Windows.Forms.MessageBox]::Show(('诊断报告已导出（已脱敏）：' + "`r`n" + $report.Path), 'NetMedic', 'OK', 'Information')
+    <#
+        图形界面的用户多半会把这个文件发到公开 Issue，所以这里导出的是**脱敏**诊断包
+        （`Export-NRSanitizedDiagnosticBundle`）。含 MAC / IP / NetworkId 的完整报告
+        只保留给命令行 `-Mode Report`，并且那条路径会打印敏感数据警告。
+    #>
+    Write-NRGuiLog -Message '正在导出脱敏诊断包…' -Kind 'Head'
+    $report = Export-NRSanitizedDiagnosticBundle
+    Write-NRGuiLog -Message ('脱敏诊断包已导出：{0}' -f $report.Path) -Kind 'Ok'
+    Write-NRGuiLog -Message '已排除机器名、MAC 地址、IP 地址、NetworkId、注册表路径与凭据，可直接分享。'
+    [void][System.Windows.Forms.MessageBox]::Show(
+        ('脱敏诊断包已导出：' + "`r`n" + $report.Path + "`r`n`r`n" +
+         '已排除机器名、MAC 地址、IP 地址与 NetworkId，可直接发给维护者。'),
+        'NetMedic', 'OK', 'Information')
 }
 
 function Invoke-NRGuiUpdateCheck {

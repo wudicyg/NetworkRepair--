@@ -1,4 +1,22 @@
 ﻿[CmdletBinding()]
+<#
+.SYNOPSIS
+    生成 NetMedic 脱敏诊断包（可安全公开发布到 Issue / Discussions）。
+
+.DESCRIPTION
+    这是脚本方式的调用入口。真正的裁剪逻辑在 `src\SanitizedReport.ps1`，
+    这样图形界面、命令行与压平后的单文件分发可以共用同一份实现。
+
+    脱敏诊断包刻意排除：机器名、MAC 地址、IP 地址、注册表路径、NetworkId、
+    URL 与凭据。需要完整数据排障时请用 `-Mode Report`，但那会自动落盘敏感信息，
+    公开前必须自行脱敏。
+
+.PARAMETER OutputPath
+    输出 zip 路径。省略时写入临时目录下的 NetMedic_Sanitized_<时间戳>.zip。
+
+.EXAMPLE
+    .\tools\Export-NRSanitizedDiagnosticBundle.ps1
+#>
 param(
     [string]$OutputPath
 )
@@ -29,170 +47,17 @@ $Script:LogFile = Join-Path $Script:Logs ('support_{0}.log' -f (Get-Date -Format
 . (Join-Path $Src 'RepairPlan.ps1')
 . (Join-Path $Src 'Ncsi.ps1')
 . (Join-Path $Src 'Diagnostics.ps1')
-
-function ConvertTo-NRSanitizedCandidate {
-    param([Parameter(Mandatory)]$Candidate)
-
-    $profileClass = 'Other'
-    if ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^网络\s+\d+$') {
-        $profileClass = 'ChineseNumbered'
-    } elseif ($Candidate.ProfileName -and ([string]$Candidate.ProfileName).Trim() -match '^Network\s+\d+$') {
-        $profileClass = 'EnglishNumbered'
-    }
-
-    [pscustomobject]@{
-        ProfileClass = $profileClass
-        Managed = [bool]$Candidate.Managed
-        IsActive = [bool]$Candidate.IsActive
-        RiskScore = $Candidate.RiskScore
-        RiskLevel = $Candidate.RiskLevel
-        RemediationAllowed = [bool]$Candidate.RemediationAllowed
-        DiagnosticCodes = @($Candidate.DiagnosticCodes)
-        NetworkCorrelation = [string]$Candidate.NetworkCorrelation
-        NlmIsConnected = [bool]$Candidate.NlmIsConnected
-    }
-}
-
-function Export-NRSanitizedDiagnosticBundle {
-    param([string]$Path)
-
-    $diagnostics = Get-NRDiagnostics
-
-    $bundle = [pscustomobject]@{
-        SchemaVersion = '1.0'
-        Sanitized = $true
-        ReadOnly = $true
-        GeneratedAt = (Get-Date).ToString('o')
-        Application = $Script:AppName
-        ApplicationVersion = $Script:AppVersion
-        Windows = [pscustomobject]@{
-            Caption = [string]$diagnostics.Windows.Caption
-            Version = [string]$diagnostics.Windows.Version
-            Build = [string]$diagnostics.Windows.Build
-            Architecture = [string]$diagnostics.Windows.Architecture
-            PowerShell = [string]$diagnostics.Windows.PowerShell
-        }
-        NetworkHealth = $diagnostics.NetworkHealth
-        ProfileHygieneStatus = [string]$diagnostics.ProfileHygieneStatus
-        RepairRecommendation = [string]$diagnostics.RepairRecommendation
-        SafeCandidateCount = [int]$diagnostics.SafeCandidateCount
-        HighRiskCount = [int]$diagnostics.HighRiskCount
-        NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
-            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
-        }).Count
-        CurrentConnections = @($diagnostics.Connections | ForEach-Object {
-            [pscustomobject]@{
-                NetworkCategory = $_.NetworkCategory
-                IPv4Connectivity = $_.IPv4Connectivity
-                IPv6Connectivity = $_.IPv6Connectivity
-            }
-        })
-        Adapters = @($diagnostics.Adapters | ForEach-Object {
-            [pscustomobject]@{
-                Status = $_.Status
-                LinkSpeed = $_.LinkSpeed
-                MediaType = $_.MediaType
-                Virtual = $_.Virtual
-            }
-        })
-        NetworkListManager = [pscustomobject]@{
-            Available = [bool]$diagnostics.NetworkListManager.Available
-            NetworkCount = if ($diagnostics.NetworkListManager.Available) { @($diagnostics.NetworkListManager.Networks).Count } else { 0 }
-            ExactNetworkIdCorrelationCount = @($diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
-        }
-        Candidates = @($diagnostics.Candidates | ForEach-Object {
-            ConvertTo-NRSanitizedCandidate -Candidate $_
-        })
-        IPConfiguration = @($diagnostics.IPConfiguration | ForEach-Object {
-            [pscustomobject]@{
-                InterfaceIndex = $_.InterfaceIndex
-                IPv4AddressCount = @($_.IPv4Addresses).Count
-                IPv6AddressCount = @($_.IPv6Addresses).Count
-                HasIPv4Gateway = @($_.IPv4Gateway).Count -gt 0
-                IPv4Dhcp = $_.IPv4Dhcp
-                IPv6Dhcp = $_.IPv6Dhcp
-                DnsServerIPv4Count = @($_.DnsServersIPv4).Count
-                DnsServerIPv6Count = @($_.DnsServersIPv6).Count
-            }
-        })
-        GatewayDiagnostics = [pscustomobject]@{
-            TestedCount = @($diagnostics.Gateways).Count
-            FailedCount = @($diagnostics.Gateways | Where-Object { -not $_.Reachable }).Count
-        }
-        DnsDiagnostics = [pscustomobject]@{
-            TestedCount = @($diagnostics.DnsServers).Count
-            FailedCount = @($diagnostics.DnsServers | Where-Object { -not $_.ResolvesNCSI }).Count
-        }
-        NCSI = [pscustomobject]@{
-            Skipped = [bool]$diagnostics.NCSI.Skipped
-            Enabled = $diagnostics.NCSI.Enabled
-            Dns = $diagnostics.NCSI.Dns
-            Http = $diagnostics.NCSI.Http
-        }
-        IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
-        DiagnosticErrorCount = @($diagnostics.DiagnosticsErrors).Count
-        Redaction = [pscustomobject]@{
-            ComputerName = $true
-            MacAddress = $true
-            IPAddress = $true
-            RegistryPath = $true
-            NetworkId = $true
-            NetworkUrl = $true
-            Credentials = $true
-        }
-    }
-
-    $json = $bundle | ConvertTo-Json -Depth 12
-    if (-not $Path) {
-        $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-        $Path = Join-Path $Script:Reports ('NetMedic_Sanitized_{0}.zip' -f $stamp)
-    }
-
-    $tempDir = Join-Path ([IO.Path]::GetTempPath()) ('NetMedic_Sanitized_{0}' -f [guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-    try {
-        $jsonPath = Join-Path $tempDir 'diagnostic.json'
-        $readmePath = Join-Path $tempDir 'README.txt'
-        $json | Set-Content -LiteralPath $jsonPath -Encoding UTF8
-        @(
-            'NetMedic sanitized diagnostic bundle'
-            ''
-            'This bundle is read-only diagnostic evidence.'
-            'It intentionally excludes computer name, MAC addresses, IP addresses, registry paths, NetworkId values, URLs, and credentials.'
-        ) | Set-Content -LiteralPath $readmePath -Encoding UTF8
-
-        $parent = Split-Path -Parent $Path
-        if ($parent -and -not (Test-Path -LiteralPath $parent)) {
-            New-Item -ItemType Directory -Path $parent -Force | Out-Null
-        }
-        if (Test-Path -LiteralPath $Path) {
-            Remove-Item -LiteralPath $Path -Force
-        }
-        Compress-Archive -Path (Join-Path $tempDir '*') -DestinationPath $Path -Force
-    } finally {
-        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    [pscustomobject]@{
-        Success = $true
-        Path = $Path
-        Sanitized = $true
-        ReadOnly = $true
-        SafeCandidateCount = $bundle.SafeCandidateCount
-        ProfileHygieneStatus = $bundle.ProfileHygieneStatus
-        NetworkHealth = $bundle.NetworkHealth.Status
-    }
-}
+. (Join-Path $Src 'SanitizedReport.ps1')
 
 try {
     $result = Export-NRSanitizedDiagnosticBundle -Path $OutputPath
     $result | ConvertTo-Json -Depth 6
 } catch {
     [pscustomobject]@{
-        Success = $false
+        Success   = $false
         Sanitized = $true
-        ReadOnly = $true
-        Error = $_.Exception.Message
+        ReadOnly  = $true
+        Error     = $_.Exception.Message
     } | ConvertTo-Json -Depth 6
     exit 1
 }

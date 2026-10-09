@@ -4,8 +4,9 @@
     生成 NetMedic 应用图标（多尺寸 ICO）。
 
 .DESCRIPTION
-    用 System.Drawing 绘制图标并手写 ICO 容器。ICO 里使用传统的 DIB（BMP）条目而不是
-    PNG 条目，因为 csc.exe（ps2exe 编译 exe 时使用）对 PNG 压缩条目的兼容性没有保证。
+    用 System.Drawing 绘制图标并手写 ICO 容器。小尺寸（16/32/48）使用传统的 DIB（BMP）条目，
+    大尺寸（64/128/256，阈值可用 -PngCompressionFromSize 调整）使用 PNG 压缩条目：PNG 条目体积
+    明显更小且 Vista 及以上都支持，小尺寸保留 DIB 以兼顾兼容性。
 
     尺寸包含 16 / 32 / 48 / 64 / 128 / 256，全部带 alpha 通道。可用 -PreviewPath 额外输出
     一张放大的 PNG 预览，便于人工确认图标实际长什么样。
