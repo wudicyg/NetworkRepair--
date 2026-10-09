@@ -18,7 +18,9 @@
 - 所有改动走分支 + PR，禁止直接推送 `main`。
 - 分支命名：`fix/<主题>`、`feat/<主题>`、`docs/<主题>`、`test/<主题>`、`release/<版本>`。
 - 提交信息使用 Conventional Commits：`fix: …`、`feat: …`、`docs: …`、`test: …`、`release: …`。
-- PR 必须通过 CI 门禁：Windows PowerShell 5.1 与 PowerShell 7 的语法解析 + Pester，以及发布包冒烟测试。
+- PR 必须通过 CI 门禁：Windows PowerShell 5.1 与 PowerShell 7 双引擎的语法解析 + Pester，以及发布包
+  冒烟测试（构建 zip 与便携 exe、校验包内必需内容与 SHA-256、真实运行单文件入口、启动图形版 exe 做
+  `-Mode GuiSmoke` 自检、联网验证一次更新检查）与发布工作流的安全约束断言。
 
 ## 测试
 
