@@ -191,7 +191,23 @@ try {
     Assert-NRAdministrator -RelaunchArguments ($relaunch -join ' ')
     switch ($Mode) {
         'Menu' { exit (Invoke-NRMenu) }
-        'Scan' { $r = Invoke-NRScan -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } }
+        'Scan' {
+            $r = Invoke-NRScan -SkipConnectivityTest:$SkipConnectivityTest
+            if ($Json) {
+                if ($IncludeSensitiveDetails) {
+                    Write-Warning 'Scan JSON 包含本机诊断细节；请勿公开上传。'
+                    [pscustomobject]@{
+                        SchemaVersion = '1.0'
+                        Sanitized = $false
+                        IncludesSensitiveDetails = $true
+                        Warning = 'This JSON contains local identifiers. Keep it private; do not upload publicly.'
+                        Diagnostics = $r
+                    } | ConvertTo-Json -Depth 12
+                } else {
+                    ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $r | ConvertTo-Json -Depth 12
+                }
+            }
+        }
         'Repair' { $r = Invoke-NRRepair -Deep:$false -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'DeepRepair' { $r = Invoke-NRRepair -Deep:$true -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'Backup' { $r = New-NRBackup; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('备份完成：{0}' -f $r.Path) 'Green' } }
