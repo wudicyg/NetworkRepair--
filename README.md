@@ -2,14 +2,16 @@
 
 安全、智能、可回滚的 Windows 网络配置诊断与修复工具。
 
-> 当前稳定版本：**1.0.0**
+> 当前稳定版本：**1.4.0**（见 [Releases](https://github.com/wudicyg/netmedic/releases)）
 >
-> `1.0.0` 为项目首个正式稳定版。核心 Safe Repair、历史编号 Profile 清理、Backup/Restore、诊断与回滚路径已完成收口，并已在真实 Windows 10 / PowerShell 5.1 环境完成核心行为验证。Windows 11 及更多语言/系统组合保留为后续兼容性扩展验证。
+> 已经具备：图形界面（双击即用，无需记命令）、单文件免安装 exe、应用图标、更新检查、多级恢复点与按需服务刷新。
+> 核心修复路径（Safe Repair / 历史编号 Profile 清理 / 备份与恢复 / 失败回滚）已在真实 Windows 10 + PowerShell 5.1 环境完成行为验证；
+> **Windows 11 与更多语言/系统组合仍属于待验证的扩展兼容性项**，尚未作为发布阻塞项。
 
 > **项目定位**：专门解决 Windows 网络名称持续出现「网络 2 / 网络 3 / 网络 4 / …」等历史 Network Profile 累积问题。  
 > 在不破坏当前活动网络的前提下，先诊断、再备份、后清理并验证；同时提供 DNS、DHCP、网关、NCSI 等常见网络故障诊断与可回滚修复能力。
 
-当前主分支：**1.0.0**
+当前 `main` 分支版本：**1.4.0**
 
 NetMedic 的目标不是“暴力清理注册表”，而是：
 
@@ -51,6 +53,8 @@ NetMedic 的核心任务不是“重置整个网络”，而是解决 Windows �
 - 图形界面（WinForms）：五张状态卡 + 一键操作按钮 + 带颜色的运行日志；修复前展示计划并要求确认
 - 更新检查：命令行 `-Mode CheckUpdate` 与界面「检查更新」按钮；只检查与告知，不自动下载或替换自身
 - 窗口化单文件主程序：双击直接进界面，无控制台窗口；控制台菜单与命令行参数仍通过 `备用启动` 与脚本可用
+- 应用图标：`assets\NetMedic.ico` 嵌入 exe，窗口、任务栏与资源管理器统一显示
+- 一键脱敏诊断包：只保留排障所需的非敏感摘要，排除机器名、MAC 地址、IP 地址、NetworkId、注册表路径与凭据（GUI「导出诊断报告」按钮直接产出这种）
 
 ## 快速开始
 
@@ -78,6 +82,7 @@ NetworkRepair.bat
 命令行：
 
 ```bat
+NetworkRepair.bat -Mode Gui
 NetworkRepair.bat -Mode Scan
 NetworkRepair.bat -Mode Repair
 NetworkRepair.bat -Mode DeepRepair
@@ -86,7 +91,12 @@ NetworkRepair.bat -Mode Report
 NetworkRepair.bat -Mode Rename -NetworkId "{GUID}" -NewName "Office"
 NetworkRepair.bat -Mode CheckUpdate
 NetworkRepair.bat -Mode CheckUpdate -Json
+NetworkRepair.bat -Mode Version
 ```
+
+> 全部可用模式（`-Mode` 的合法取值）：`Menu` / `Scan` / `Repair` / `DeepRepair` / `Backup` /
+> `Restore` / `RestorePoints` / `Prune` / `Report` / `Rename` / `Gui` / `GuiSmoke` / `CheckUpdate` / `Version`。
+> 其中 `Gui` 是打包后的默认模式；`GuiSmoke` 是无界面自检（供 CI 使用）；`Version` 只打印版本号。
 
 JSON：
 
@@ -97,16 +107,21 @@ NetworkRepair.bat -Mode Scan -Json
 导出脱敏诊断包（只读，不包含机器名、MAC、IP、NetworkId 或注册表备份）：
 
 ```bat
-powershell.exe -ExecutionPolicy Bypass -File .\\tools\\Export-NRSanitizedDiagnosticBundle.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\tools\Export-NRSanitizedDiagnosticBundle.ps1
 ```
+
+> `-Mode Report` 产出的是**完整**诊断报告（含 MAC 地址、IP 地址与 NetworkId），命令会打印敏感数据
+> 警告，公开分享前请改用上面的脱敏诊断包。图形界面的「导出诊断报告」按钮产出的就是脱敏包。
 
 构建发布包（开发者/维护者）：
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\\tools\\New-NRReleasePackage.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\tools\New-NRReleasePackage.ps1
 ```
 
-发布包由带 `v` 前缀的版本 Tag 触发 GitHub Actions 自动构建，并生成 ZIP 与 SHA-256 校验文件。发布 Tag 必须与 `NetworkRepair.ps1` 中的版本完全一致。
+发布包由带 `v` 前缀的版本 Tag 触发 GitHub Actions 自动构建，产出 `NetMedic_<版本>_Windows.zip`、
+`NetMedic-<版本>-Portable.exe` 以及各自同名的 `.sha256` 校验文件，并为发布页附件写入中文标签。
+发布 Tag 必须与 `NetworkRepair.ps1` 中的版本完全一致。
 
 跳过 Internet/DNS 测试：
 
@@ -117,24 +132,27 @@ NetworkRepair.bat -Mode Scan -SkipConnectivityTest
 
 ## 发布流程
 
-GitHub Release 不会因为合并到 `main` 自动产生；只有推送与 `NetworkRepair.ps1` 版本完全一致的 Tag 后，Release 工作流才会创建发行版。
+GitHub Release 不会因为合并到 `main` 自动产生；只有推送与 `NetworkRepair.ps1` 里的 `$Script:AppVersion` **完全一致**的 Tag 后，Release 工作流才会创建发行版。版本号只在那一处硬编码，请以 [Releases](https://github.com/wudicyg/netmedic/releases) 与 [CHANGELOG.md](CHANGELOG.md) 为准。
 
-当前稳定版为：
-
-```text
-1.0.0
-```
-
-正式稳定版本 Tag：
+发版步骤：
 
 ```powershell
-git tag v1.0.0
-git push origin v1.0.0
+# 1) 在分支上把 NetworkRepair.ps1 的版本号提升到目标版本，
+#    并把 CHANGELOG.md 的 Unreleased 段落定稿为 ## [<版本>] - <日期>
+# 2) 走分支 → PR → CI 通过 → 合并到 main
+# 3) 推送与版本号一致的 Tag
+git tag v<版本>
+git push origin v<版本>
 ```
 
-发布工作流会把与应用版本完全一致的 Tag 作为正式 Release 构建。后续开发版本从 `1.1.0-dev` 开始。
+发布工作流会依次：校验 Tag 与应用版本一致 → 跑 Pester → 构建发布包（窗口化单文件 exe + 完整 zip + SHA-256）→ **用 CHANGELOG 对应段落生成发布正文**（含"该下载哪个文件"的说明）→ 创建 Release → 写入附件的中文标签。
 
-Release 工作流会在发布前执行 PowerShell 5.1 / PowerShell 7 所需的 Pester 测试、构建 Windows ZIP、生成 SHA-256 校验文件，并校验 Tag 与应用版本是否完全一致。当前版本以 Windows 10 实机核心场景为主要行为证据，Windows 11 与更多环境组合属于后续扩展验证。
+> 发布正文取自 `CHANGELOG.md`：如果目标版本没有对应段落，流水线会直接失败——这样"工具发新版、文档没跟上"不会再发生。
+
+更完整的门禁由 CI 工作流负责：Windows PowerShell 5.1 与 PowerShell 7 双引擎的语法解析与 Pester、
+发布包内容与 SHA-256 校验、单文件入口真实运行、图形版 exe 的启动自检，以及一次真实网络的更新检查。
+
+行为的实机证据以 Windows 10 核心场景为主；Windows 11 与更多环境组合属于后续扩展验证。
 ## 安全模型
 
 ### Safe Repair
@@ -244,19 +262,27 @@ NetMedic/
 │  ├─ New-NRSingleFileDistribution.ps1
 │  ├─ New-NRIcon.ps1
 │  ├─ New-NRReleasePackage.ps1
+│  ├─ Get-NRReleaseNotes.ps1
 │  ├─ Test-NRReleasePackage.ps1
 │  └─ Set-NRReleaseAssetLabels.ps1
 ├─ assets/
 │  └─ NetMedic.ico
+├─ .github/
+│  ├─ workflows/                 ← ci.yml / release.yml
+│  ├─ ISSUE_TEMPLATE/
+│  └─ PULL_REQUEST_TEMPLATE.md
 ├─ docs/
-├─ backups/
-├─ logs/
+├─ backups/                      ← 运行期自动创建（仓库内仅 .gitkeep）
+├─ logs/                         ← 运行期自动创建（仓库内仅 .gitkeep）
+├─ reports/                      ← 运行期自动创建，存放导出的诊断报告
 ├─ README.md
 ├─ 使用说明.md
 ├─ LICENSE
 ├─ CHANGELOG.md
 ├─ CONTRIBUTING.md
-└─ SECURITY.md
+├─ CODE_OF_CONDUCT.md
+├─ SECURITY.md
+└─ .gitignore
 ```
 
 发布包面向普通用户的布局（发布页下载的 zip 解压后）：
@@ -268,6 +294,8 @@ NetMedic_<版本>_Windows/
 ├─ 备用启动/
 │  └─ 启动-网络医生.bat      ← exe 被安全软件拦截时使用
 ├─ NetworkRepair.single.ps1     ← 与 exe 内容相同的单文件脚本（便于审计）
+├─ RELEASE-MANIFEST.txt         ← 构建产物清单（版本、生成时间、入口、提权方式）
+├─ assets/NetMedic.ico          ← 程序图标（脚本方式运行时窗口图标从这里取）
 ├─ NetworkRepair.ps1 + src/     ← 开发用源码入口与模块
 ├─ tools/  docs/                ← 维护工具与设计文档
 └─ README.md / CHANGELOG.md / LICENSE / ...
@@ -294,7 +322,11 @@ NetMedic 使用 Windows `NetConnection` 模块获取 Connection Profile，并以
 
 ## 项目路线
 
-当前 `main` 已包含 1.0.0 的 Repair Planner、scoped Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、只读快速 TUI 状态、脱敏诊断包与 Safe Repair 执行过程反馈。1.0.0 的核心发布阻塞项已收口，后续重点转向更精细的恢复点、服务刷新与用户体验能力。
+`1.4.0` 起，普通用户拿到的是**带图形界面的单文件程序**：双击 `网络医生.exe` 即可，顶部状态卡看结论、一键按钮做修复、修改前自动备份并可回滚；程序自己会提示有没有新版本。
+
+已完成：Safe Repair 与历史编号 Profile 清理、Repair Planner 与执行计划确认、scoped Restore 快照校验、网络健康 / Profile 历史遗留双轨判定、多级恢复点（分级 + 固定 + 显式清理）、按需服务刷新、脱敏诊断包、单文件分发与中文入口、图形界面、应用图标、更新检查。
+
+后续重点（见 [路线图](docs/roadmap.md)）：**回归测试矩阵**（把已知故障场景固化为用例）与 **Windows 11 / 更多环境扩展验证**。
 
 ## License
 
