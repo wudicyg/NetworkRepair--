@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **脱敏声明与实现不符（隐私问题）**：图形界面的「导出诊断报告」按钮此前调用的是完整的 `Export-NRReport`，产出物包含 MAC 地址、IP 地址、NetworkId 等身份信息，而界面文案与本项目文档都声称"已脱敏"——照着文档操作会把本机身份信息直接贴进公开 Issue。现在：
+  - 新增 `src/SanitizedReport.ps1`，把脱敏逻辑从 `tools\Export-NRSanitizedDiagnosticBundle.ps1` 提到模块层，让图形界面、脚本入口与压平后的单文件分发共用同一份实现；
+  - 图形界面「导出诊断报告」改为**真的输出脱敏包**；
+  - 命令行 `-Mode Report` 与控制台菜单 `[6]` 仍然产出完整报告（维护者排障需要），但会打印敏感数据警告并指向脱敏诊断包。
+
+### Changed
+- **全仓库文档与实现对齐**：修正多处"工具已经更新、文档还停在旧版本"的问题。
+  - `README.md`：版本状态块、发布流程与项目路线更新到当前状态；补上 `-Mode Gui` / `-Mode Version` 与完整的 14 个模式清单、应用图标与脱敏诊断包能力、`.github/`、`CODE_OF_CONDUCT.md`、`reports/`、`assets\NetMedic.ico`、`RELEASE-MANIFEST.txt` 等结构与包布局；修正两处双反斜杠路径笔误。
+  - `docs/roadmap.md`：重写为「已完成阶段 + 当前待办」，去掉重复条目，补齐 1.2.0 / 1.3.0 / 1.4.0 的已交付记录。
+  - `docs/diagnostic-codes.md`：整表与代码对齐——删除代码中并不存在的 `NR0000` 与 `NR3001`–`NR3004`，修正 `NR2001` / `NR2002` 的真实含义（NCSI DNS / HTTP 探测，而不是 TCP/443），补上完全未记载的 `NR2003` / `NR2101` / `NR2201`，并说明两类代码分别出现在哪里。
+  - `docs/release-validation.md`：从 1.0.0 时期的记录重写为通用发布验证，补当前版本验收范围与发布产物/图形界面回归清单，修正"在发布包里运行 `NetworkRepair.bat`"这类失效指引与只读采集器的隐私说明。
+  - `docs/collaboration.md` / `docs/architecture.md`：补发布正文与中文附件标签步骤、CI 真实门禁范围、更新检查的双数据源与 TLS 处理、入口层结构，以及脱敏包与完整报告的分工。
+  - `使用说明.md` / `.github/ISSUE_TEMPLATE/bug_report.md` / `CONTRIBUTING.md` / PR 模板：区分脱敏包与完整报告、补齐下载项与包内文件清单、控制台菜单 `[0]` 退出、CI 门禁描述。
+  - 工具帮助块：`New-NRIcon.ps1` 关于 ICO 条目格式的说明与实际实现（小尺寸 DIB、大尺寸 PNG）相反，已修正；`New-NRReleasePackage.ps1` 的产物树（便携 exe 在 zip 同级且为 ASCII 名、补 `RELEASE-MANIFEST.txt`）与 `New-NRSingleFileDistribution.ps1`（备用启动器子目录、默认 Gui 模式、`-noOutput` 必需项、图标嵌入）也已对齐。
+- **发布页与仓库元数据**：仓库描述重写为当前定位并补 12 个 topics；发布正文改为**从 CHANGELOG 对应段落生成**（新增 `tools/Get-NRReleaseNotes.ps1`），并附「该下载哪个文件」的说明——此前的 `--generate-notes` 只列 PR 标题，对下载程序的用户几乎没有信息量。历史发布页（v1.0.0–v1.4.0）的正文已按同一规则重建。
+- `.gitignore` 补上构建与验证产物：`dist/`、`dist-console/`、`dist-gui/`、`release/`、`release-check/`、`validation/`、`icon-preview.png`、`RELEASE-NOTES.md`。
+
 ## [1.4.0] - 2026-10-08
 
 ### Changed
