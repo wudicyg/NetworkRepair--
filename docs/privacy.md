@@ -11,7 +11,7 @@
 
 ## 默认诊断报告
 
-GUI 的「导出诊断报告」、命令行 `-Mode Report`、只读验收工具以及一键脱敏诊断 ZIP 默认输出脱敏摘要。摘要会保留排障所需的非标识信息，例如 Windows/PowerShell 版本、网络健康状态、Profile 类型与数量、风险等级、诊断码、DHCP 状态、地址/网关/DNS 数量以及探测结果。
+GUI 的「导出诊断报告」、命令行 `-Mode Report`、`-Mode Scan -Json`、只读验收工具以及一键脱敏诊断 ZIP 默认输出脱敏摘要。摘要会保留排障所需的非标识信息，例如 Windows/PowerShell 版本、网络健康状态、Profile 类型与数量、风险等级、诊断码、DHCP 状态、地址/网关/DNS 数量以及探测结果。
 
 默认摘要不会包含计算机名、适配器名称与描述、Profile 原名、MAC 地址、IP 地址、默认网关/DNS 地址、NetworkId、注册表路径、Network URL 或凭据。候选项按 `ChineseNumbered` / `EnglishNumbered` / `Other` 分类，不输出具体网络名称。
 
