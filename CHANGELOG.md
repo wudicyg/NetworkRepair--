@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] — 1.5.0-dev
+## [1.5.0-dev] — Unreleased
 
 ### Changed
 - 普通 GUI / CLI 诊断报告默认输出统一脱敏摘要；完整敏感详情必须显式使用 `-IncludeSensitiveDetails`。
