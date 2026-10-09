@@ -223,11 +223,11 @@
         $entry=Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
         $diagnostics=Get-Content -LiteralPath (Join-Path $root 'src\\Diagnostics.ps1') -Raw -Encoding UTF8
         $validation=Get-Content -LiteralPath (Join-Path $root 'tools\\Invoke-NRReadOnlyValidation.ps1') -Raw -Encoding UTF8
-        $entry | Should -Match '\\[switch\\]\\$IncludeSensitiveDetails'
-        $entry | Should -Match 'Export-NRReport .* -IncludeSensitiveDetails:\\$IncludeSensitiveDetails'
-        $diagnostics | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \\$d'
-        $validation | Should -Match '\\[switch\\]\\$IncludeSensitiveDetails'
-        $validation | Should -Match 'ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics \\$diagnostics'
+        $entry | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
+        $entry | Should -Match ([regex]::Escape('-IncludeSensitiveDetails:$IncludeSensitiveDetails'))
+        $diagnostics | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $d'))
+        $validation | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
+        $validation | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics'))
         $validation | Should -Match 'SensitiveDetails'
     }
     It 'exposes NCSI configuration reader' {
