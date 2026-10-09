@@ -48,8 +48,18 @@ function Export-NRReport {
     param([string]$Path,[switch]$SkipConnectivityTest,[switch]$IncludeSensitiveDetails)
     if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
     $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
-    if ($IncludeSensitiveDetails) { $reportData = $d; Write-NRLog 'Exporting a full diagnostic report containing sensitive local identifiers.' 'WARN' }
-    else { $reportData = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $d }
+    if ($IncludeSensitiveDetails) {
+        $reportData = [pscustomobject]@{
+            SchemaVersion = '1.0'
+            Sanitized = $false
+            IncludesSensitiveDetails = $true
+            Warning = 'This report contains local identifiers. Keep it private; do not upload publicly.'
+            Diagnostics = $d
+        }
+        Write-NRLog 'Exporting a full diagnostic report containing sensitive local identifiers.' 'WARN'
+    } else {
+        $reportData = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $d
+    }
     $reportData | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Path -Encoding UTF8
     Write-NRLog ('Diagnostic report exported: {0}; Sanitized={1}' -f $Path,(-not [bool]$IncludeSensitiveDetails))
     [pscustomobject]@{Success=$true;Path=$Path;Sanitized=(-not [bool]$IncludeSensitiveDetails);IncludesSensitiveDetails=[bool]$IncludeSensitiveDetails;Diagnostics=$reportData}
