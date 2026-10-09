@@ -37,55 +37,43 @@ $Script:LogFile = Join-Path $Script:Logs ('validation_{0}.log' -f (Get-Date -For
 $diagnostics = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
 
 if ($IncludeSensitiveDetails) {
-$evidence = [pscustomobject]@{
-    SchemaVersion = '1.0'
-    ReadOnly = $true
-    GeneratedAt = (Get-Date).ToString('o')
-    ComputerName = $env:COMPUTERNAME
-    Application = $Script:AppName
-    ApplicationVersion = $Script:AppVersion
-    Windows = $diagnostics.Windows
-    NetworkHealth = $diagnostics.NetworkHealth
-    ProfileHygieneStatus = $diagnostics.ProfileHygieneStatus
-    RepairRecommendation = $diagnostics.RepairRecommendation
-    SafeCandidateCount = $diagnostics.SafeCandidateCount
-    HighRiskCount = $diagnostics.HighRiskCount
-    NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
-        $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
-    }).Count
-    CurrentConnections = @($diagnostics.Connections | Select-Object Name,InterfaceAlias,NetworkCategory,IPv4Connectivity,IPv6Connectivity)
-    Adapters = @($diagnostics.Adapters | Select-Object Name,InterfaceDescription,Status,LinkSpeed,MediaType,Virtual)
-    NetworkListManager = [pscustomobject]@{
-        Available = [bool]$diagnostics.NetworkListManager.Available
-        NetworkCount = if ($diagnostics.NetworkListManager.Available) { @($diagnostics.NetworkListManager.Networks).Count } else { 0 }
-        ExactNetworkIdCorrelationCount = @($diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
+    $evidence = [pscustomobject]@{
+        SchemaVersion = '1.0'
+        ReadOnly = $true
+        Sanitized = $false
+        IncludesSensitiveDetails = $true
+        GeneratedAt = (Get-Date).ToString('o')
+        ComputerName = $env:COMPUTERNAME
+        Application = $Script:AppName
+        ApplicationVersion = $Script:AppVersion
+        Windows = $diagnostics.Windows
+        NetworkHealth = $diagnostics.NetworkHealth
+        ProfileHygieneStatus = $diagnostics.ProfileHygieneStatus
+        RepairRecommendation = $diagnostics.RepairRecommendation
+        SafeCandidateCount = $diagnostics.SafeCandidateCount
+        HighRiskCount = $diagnostics.HighRiskCount
+        NumberedProfileCount = @($diagnostics.Candidates | Where-Object {
+            $_.ProfileName -and ([string]$_.ProfileName).Trim() -match '^(网络|Network)\s+\d+$'
+        }).Count
+        CurrentConnections = @($diagnostics.Connections | Select-Object Name,InterfaceAlias,NetworkCategory,IPv4Connectivity,IPv6Connectivity)
+        Adapters = @($diagnostics.Adapters | Select-Object Name,InterfaceDescription,Status,LinkSpeed,MediaType,Virtual)
+        NetworkListManager = [pscustomobject]@{
+            Available = [bool]$diagnostics.NetworkListManager.Available
+            NetworkCount = if ($diagnostics.NetworkListManager.Available) { @($diagnostics.NetworkListManager.Networks).Count } else { 0 }
+            ExactNetworkIdCorrelationCount = @($diagnostics.NetworkIdentityCorrelations | Where-Object Correlation -eq 'ExactNetworkId').Count
+        }
+        Candidates = @($diagnostics.Candidates | Select-Object KeyName,ProfileName,Managed,IsActive,RiskScore,RiskLevel,RemediationAllowed,DiagnosticCodes,NetworkId,NetworkName,NetworkCorrelation,NlmIsConnected,Reason,LastWrite)
+        IPConfiguration = @($diagnostics.IPConfiguration | Select-Object InterfaceAlias,InterfaceIndex,IPv4Addresses,IPv6Addresses,IPv4Gateway,IPv4Dhcp,DnsServersIPv4)
+        Gateways = @($diagnostics.Gateways)
+        DnsServers = @($diagnostics.DnsServers)
+        NCSI = $diagnostics.NCSI
+        IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
     }
-    Candidates = @($diagnostics.Candidates | Select-Object KeyName,ProfileName,Managed,IsActive,RiskScore,RiskLevel,RemediationAllowed,DiagnosticCodes,NetworkId,NetworkName,NetworkCorrelation,NlmIsConnected,Reason,LastWrite)
-    IPConfiguration = @($diagnostics.IPConfiguration | Select-Object InterfaceAlias,InterfaceIndex,IPv4Addresses,IPv6Addresses,IPv4Gateway,IPv4Dhcp,DnsServersIPv4)
-    Gateways = @($diagnostics.Gateways)
-    DnsServers = @($diagnostics.DnsServers)
-    NCSI = $diagnostics.NCSI
-    IssueDetails = @($diagnostics.IssueDetails | Select-Object Code,Severity,Message)
-}
-
-
-if ($IncludeSensitiveDetails) {
-    [void]$evidence.PSObject.Properties.Remove('Sanitized')
-    $evidence | Add-Member -NotePropertyName Sanitized -NotePropertyValue $false -Force
-    $evidence | Add-Member -NotePropertyName IncludesSensitiveDetails -NotePropertyValue $true -Force
     Write-Warning '敏感详情模式会导出计算机名、Profile/接口名、NetworkId、注册表路径和 IP 配置。请只保存在本机安全位置，切勿公开上传。'
 } else {
     $evidence = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
     $evidence | Add-Member -NotePropertyName EvidenceType -NotePropertyValue 'SanitizedReadOnlyValidation' -Force
 }
-    $evidence | Add-Member -NotePropertyName Sanitized -NotePropertyValue $false -Force
-    $evidence | Add-Member -NotePropertyName IncludesSensitiveDetails -NotePropertyValue $true -Force
-    Write-Warning '敏感详情模式会导出计算机名、Profile/接口名、NetworkId、注册表路径和 IP 配置。请只保存在本机安全位置，切勿公开上传。'
-} else {
-    $evidence = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
-    $evidence | Add-Member -NotePropertyName EvidenceType -NotePropertyValue 'SanitizedReadOnlyValidation' -Force
-}
-
 if ($OutputPath) {
     $parent = Split-Path -Parent $OutputPath
     if ($parent -and -not (Test-Path -LiteralPath $parent)) {
