@@ -13,15 +13,224 @@ function Test-NRInternetConnectivity {
     [pscustomobject]@{Skipped=$false;DNS=$dnsOk;TCP443=$tcpOk}
 }
 function Invoke-NRScan { param([switch]$SkipConnectivityTest);Write-NRLog 'Starting diagnostic scan.';$d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;if(-not $Json){Show-NRDiagnostics -Diagnostics $d};Write-NRLog ('Diagnostic scan complete. SafeCandidates={0}, HighRisk={1}'-f $d.SafeCandidateCount,$d.HighRiskCount);$d }
-function Export-NRReport {
-    param([string]$Path,[switch]$SkipConnectivityTest)
-    if(!$Path){$Path=Join-Path $Script:Reports ('NetMedic_Report_{0}.json'-f (Get-Date -Format 'yyyyMMdd_HHmmss'))}
-    $d=Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest;$d|ConvertTo-Json -Depth 12|Set-Content -LiteralPath $Path -Encoding UTF8
-    Write-NRLog ('Diagnostic report exported: {0}'-f $Path);[pscustomobject]@{Success=$true;Path=$Path;Diagnostics=$d}
+function ConvertTo-NRSanitizedDiagnosticSummary {
+    <#
+        按字段白名单输出诊断摘要。不要将原始诊断对象直接复制到该摘要；
+        新增字段默认不导出，以避免隐私泄漏随诊断模型扩展而发生。
+    #>
+    param([Parameter(Mandatory)]$Diagnostics)
+
+    $appVersion = 'Unknown'
+    $versionVariable = Get-Variable -Name AppVersion -Scope Script -ErrorAction SilentlyContinue
+    if ($versionVariable -and $versionVariable.Value) { $appVersion = [string]$versionVariable.Value }
+
+    $windowsCaption = 'Unknown'
+    $windowsVersion = $null
+    $windowsBuild = $null
+    $windowsArchitecture = $null
+    $powerShellVersion = $null
+    if ($Diagnostics.Windows) {
+        $windowsCaption = [string]$Diagnostics.Windows.Caption
+        $windowsVersion = [string]$Diagnostics.Windows.Version
+        $windowsBuild = [string]$Diagnostics.Windows.Build
+        $windowsArchitecture = [string]$Diagnostics.Windows.Architecture
+        $powerShellVersion = [string]$Diagnostics.Windows.PowerShell
+    }
+
+    $networkHealthStatus = [string]$Diagnostics.NetworkHealth.Status
+    if ($networkHealthStatus -notin @('Healthy','Degraded','Disconnected','Unknown')) {
+        $networkHealthStatus = 'Unknown'
+    }
+
+    $profileHygieneStatus = [string]$Diagnostics.ProfileHygieneStatus
+    if ($profileHygieneStatus -notin @('Clean','HistoricalProfilesFound','ProtectedNumberedProfilesPresent','Unknown')) {
+        $profileHygieneStatus = 'Unknown'
+    }
+
+    $repairRecommendation = [string]$Diagnostics.RepairRecommendation
+    if ($repairRecommendation -notin @('NoAction','CleanHistoricalProfiles','InvestigateNetwork','Unknown')) {
+        $repairRecommendation = 'Unknown'
+    }
+
+    $sanitizedCandidates = @()
+    foreach ($candidate in @($Diagnostics.Candidates)) {
+        if ($null -eq $candidate) { continue }
+
+        $profileName = ''
+        $profileNameProperty = $candidate.PSObject.Properties['ProfileName']
+        if ($profileNameProperty -and $null -ne $profileNameProperty.Value) {
+            $profileName = ([string]$profileNameProperty.Value).Trim()
+        }
+
+        $profileClass = 'Other'
+        if ($profileName -match '^网络\s+\d+$') {
+            $profileClass = 'ChineseNumbered'
+        } elseif ($profileName -match '^Network\s+\d+$') {
+            $profileClass = 'EnglishNumbered'
+        }
+
+        $riskLevel = [string]$candidate.RiskLevel
+        if ($riskLevel -notin @('Low','Medium','High','Caution','Unknown')) {
+            $riskLevel = 'Unknown'
+        }
+
+        $diagnosticCodes = @()
+        $codesProperty = $candidate.PSObject.Properties['DiagnosticCodes']
+        if ($codesProperty -and $null -ne $codesProperty.Value) {
+            foreach ($code in @($codesProperty.Value)) {
+                if ([string]$code -match '^NR\d{4}$') { $diagnosticCodes += [string]$code }
+            }
+        }
+
+        $sanitizedCandidates += [pscustomobject]@{
+            ProfileClass = $profileClass
+            Managed = [bool]$candidate.Managed
+            IsActive = [bool]$candidate.IsActive
+            RiskScore = if ($null -eq $candidate.RiskScore) { $null } else { [int]$candidate.RiskScore }
+            RiskLevel = $riskLevel
+            RemediationAllowed = [bool]$candidate.RemediationAllowed
+            DiagnosticCodes = @($diagnosticCodes)
+            NlmIsConnected = [bool]$candidate.NlmIsConnected
+        }
+    }
+
+    $ipConfigurations = @($Diagnostics.IPConfiguration)
+    $ipv4AddressCount = 0
+    $ipv6AddressCount = 0
+    $ipv4DhcpEnabledCount = 0
+    $configurationsWithGatewayCount = 0
+    $dnsServerIPv4Count = 0
+    $dnsServerIPv6Count = 0
+    foreach ($configuration in $ipConfigurations) {
+        $ipv4AddressCount += @($configuration.IPv4Addresses).Count
+        $ipv6AddressCount += @($configuration.IPv6Addresses).Count
+        if ($configuration.IPv4Dhcp -eq $true) { $ipv4DhcpEnabledCount++ }
+        if (@($configuration.IPv4Gateway).Count -gt 0) { $configurationsWithGatewayCount++ }
+        $dnsServerIPv4Count += @($configuration.DnsServersIPv4).Count
+        $dnsServerIPv6Count += @($configuration.DnsServersIPv6).Count
+    }
+
+    $networkListManagerAvailable = $false
+    $networkListManagerNetworkCount = 0
+    if ($Diagnostics.NetworkListManager) {
+        $networkListManagerAvailable = [bool]$Diagnostics.NetworkListManager.Available
+        if ($networkListManagerAvailable) {
+            $networkListManagerNetworkCount = @($Diagnostics.NetworkListManager.Networks).Count
+        }
+    }
+
+    $ncsi = $Diagnostics.NCSI
+    $issueCodes = @()
+    foreach ($issue in @($Diagnostics.IssueDetails)) {
+        if ($issue -and [string]$issue.Code -match '^NR\d{4}$') {
+            $severity = [string]$issue.Severity
+            if ($severity -notin @('Info','Low','Warning','High','Error')) { $severity = 'Unknown' }
+            $issueCodes += [pscustomobject]@{ Code = [string]$issue.Code; Severity = $severity }
+        }
+    }
+
+    [pscustomobject]@{
+        SchemaVersion = '1.0'
+        Sanitized = $true
+        ReadOnly = $true
+        GeneratedAt = if ($Diagnostics.Timestamp) { [string]$Diagnostics.Timestamp } else { (Get-Date).ToString('o') }
+        Application = 'NetMedic'
+        ApplicationVersion = $appVersion
+        Windows = [pscustomobject]@{
+            Caption = $windowsCaption
+            Version = $windowsVersion
+            Build = $windowsBuild
+            Architecture = $windowsArchitecture
+            PowerShell = $powerShellVersion
+        }
+        NetworkHealthStatus = $networkHealthStatus
+        ProfileHygieneStatus = $profileHygieneStatus
+        RepairRecommendation = $repairRecommendation
+        SafeCandidateCount = [int]$Diagnostics.SafeCandidateCount
+        HighRiskCount = [int]$Diagnostics.HighRiskCount
+        NumberedProfileCount = @($sanitizedCandidates | Where-Object { $_.ProfileClass -in @('ChineseNumbered','EnglishNumbered') }).Count
+        CurrentConnectionCount = @($Diagnostics.Connections).Count
+        AdapterCount = @($Diagnostics.Adapters).Count
+        NetworkListManager = [pscustomobject]@{
+            Available = $networkListManagerAvailable
+            NetworkCount = $networkListManagerNetworkCount
+            ExactNetworkIdCorrelationCount = @($Diagnostics.NetworkIdentityCorrelations | Where-Object { $_.Correlation -eq 'ExactNetworkId' }).Count
+        }
+        IPConfigurationSummary = [pscustomobject]@{
+            ConfigurationCount = $ipConfigurations.Count
+            IPv4AddressCount = $ipv4AddressCount
+            IPv6AddressCount = $ipv6AddressCount
+            IPv4DhcpEnabledConfigurationCount = $ipv4DhcpEnabledCount
+            ConfigurationWithGatewayCount = $configurationsWithGatewayCount
+            DnsServerIPv4Count = $dnsServerIPv4Count
+            DnsServerIPv6Count = $dnsServerIPv6Count
+        }
+        GatewayDiagnostics = [pscustomobject]@{
+            TestedCount = @($Diagnostics.Gateways).Count
+            FailedCount = @($Diagnostics.Gateways | Where-Object { -not $_.Reachable }).Count
+        }
+        DnsDiagnostics = [pscustomobject]@{
+            TestedCount = @($Diagnostics.DnsServers).Count
+            FailedCount = @($Diagnostics.DnsServers | Where-Object { -not $_.ResolvesNCSI }).Count
+        }
+        NCSI = [pscustomobject]@{
+            Skipped = [bool]$ncsi.Skipped
+            Enabled = $ncsi.Enabled
+            Dns = $ncsi.Dns
+            Http = $ncsi.Http
+        }
+        Candidates = @($sanitizedCandidates)
+        Issues = @($issueCodes)
+        DiagnosticErrorCount = @($Diagnostics.DiagnosticsErrors).Count
+        Redaction = [pscustomobject]@{
+            ComputerName = $true
+            AdapterName = $true
+            AdapterDescription = $true
+            ProfileName = $true
+            MacAddress = $true
+            IPAddress = $true
+            GatewayAddress = $true
+            DnsServerAddress = $true
+            NetworkId = $true
+            RegistryPath = $true
+            NetworkUrl = $true
+            RawDiagnosticErrors = $true
+            Credentials = $true
+        }
+    }
 }
 
+function Export-NRReport {
+    param(
+        [string]$Path,
+        [switch]$SkipConnectivityTest,
+        [switch]$IncludeSensitiveDetails
+    )
 
-function Get-NRIPDiagnostics {
+    if (!$Path) {
+        $Path = Join-Path $Script:Reports ('NetMedic_Report_{0}.json' -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+    }
+
+    $diagnostics = Get-NRDiagnostics -SkipConnectivityTest:$SkipConnectivityTest
+    if ($IncludeSensitiveDetails) {
+        Write-Warning '正在导出完整敏感诊断详情。文件可能包含计算机名、网络标识、MAC/IP、NetworkId 与注册表路径；请仅保存在本机，不要公开上传。'
+        $payload = $diagnostics
+        $isSanitized = $false
+    } else {
+        $payload = ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics
+        $isSanitized = $true
+    }
+
+    $payload | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $Path -Encoding UTF8
+    Write-NRLog ('Diagnostic report exported: {0}; Sanitized={1}' -f $Path, $isSanitized)
+    [pscustomobject]@{
+        Success = $true
+        Path = $Path
+        Sanitized = $isSanitized
+        ReadOnly = $true
+        Diagnostics = $payload
+    }
+}function Get-NRIPDiagnostics {
     $rows = @()
     try {
         $configs = @(Get-NetIPConfiguration -All -ErrorAction Stop)
