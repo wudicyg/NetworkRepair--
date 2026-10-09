@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [1.4.0] - 2026-10-08
 
 ### Changed
 - **项目更名为 NetMedic（原 NetworkRepair）**。GitHub 仓库同步改名为 `wudicyg/netmedic`；旧地址由 GitHub 自动跳转，**已发布的 1.2.0 / 1.3.0 仍能正常检查更新**（已实测旧地址的发布列表接口仍返回 200 与全部发布）。
