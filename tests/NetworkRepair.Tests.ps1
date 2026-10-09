@@ -1040,6 +1040,14 @@
         $tool | Should -Match ([regex]::Escape('-Mode Menu'))
     }
 
+    It 'normalizes prerelease SemVer before embedding PE file version resources' {
+        $tool = Get-Content -LiteralPath (Join-Path $root 'tools\New-NRSingleFileDistribution.ps1') -Raw -Encoding UTF8
+        $tool | Should -Match 'function ConvertTo-NRFileVersion'
+        $tool | Should -Match ([regex]::Escape('$fileVersion = ConvertTo-NRFileVersion -Version $version'))
+        $tool | Should -Match ([regex]::Escape('Version     = $fileVersion'))
+        $tool | Should -Not -Match ([regex]::Escape("Version     = ('{0}.0' -f $version)"))
+    }
+
     It 'ships a valid multi-size application icon' {
         $iconPath = Join-Path $root 'assets\NetMedic.ico'
         (Test-Path -LiteralPath $iconPath) | Should -BeTrue
