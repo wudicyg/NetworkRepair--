@@ -7,7 +7,7 @@ NetMedic 的 CI 负责脚本语法（Windows PowerShell 5.1 与 PowerShell 7 双
 各版本的**核心行为验收**以 Windows 10 / PowerShell 5.1 实机结果为主要依据。Windows 11、更多 Windows
 Build 与语言环境作为后续扩展兼容性验证，不阻塞当前版本发布。
 
-## 当前版本（1.4.0）验收范围
+## 当前版本（1.5.1）验收范围
 
 除下面的通用矩阵外，1.1.0 起新增的能力也需要在实机上过一遍：
 
