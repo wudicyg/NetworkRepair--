@@ -9,13 +9,14 @@ param(
     [string]$NewName,
     [switch]$Json,
     [switch]$SkipConnectivityTest,
+    [switch]$IncludeSensitiveDetails,
     [switch]$Yes,
     [switch]$NoColor
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Script:AppName = 'NetMedic'
-$Script:AppVersion = '1.4.0'
+$Script:AppVersion = '1.5.0-dev'
 # 入口路径解析：以脚本宿主（powershell.exe -File）运行时取脚本自身路径；打包成单个 exe 后
 # $MyInvocation.MyCommand 没有 Path 属性，需要退回到进程映像与应用程序基目录，否则在
 # Set-StrictMode -Version Latest 下会直接抛「找不到属性 Path」。
@@ -151,7 +152,7 @@ function Invoke-NRMenu {
                 }
                 Pause-NR
             }
-            '6' { $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest; Write-NRLine ('报告：{0}' -f $r.Path) 'Green'; Pause-NR }
+            '6' { $r = Export-NRReport -SkipConnectivityTest:$SkipConnectivityTest -IncludeSensitiveDetails:$IncludeSensitiveDetails; Write-NRLine ('报告：{0}（脱敏={1}）' -f $r.Path, $r.Sanitized) 'Green'; Pause-NR }
             '7' { $id=Read-Host 'NetworkId (GUID)'; $name=Read-Host '新名称'; Invoke-NRNetworkRenameOperation -NetworkId $id -NewName $name -AssumeYes:$false | Out-Null; Pause-NR }
             '0' { return 0 }
             default { Write-NRLine '无效选择。' 'Yellow'; Start-Sleep -Milliseconds 700 }
@@ -184,12 +185,23 @@ try {
     if ($NewName) { [void]$relaunch.Add('-NewName'); [void]$relaunch.Add(('"{0}"' -f $NewName)) }
     if ($Json) { [void]$relaunch.Add('-Json') }
     if ($SkipConnectivityTest) { [void]$relaunch.Add('-SkipConnectivityTest') }
+    if ($IncludeSensitiveDetails) { [void]$relaunch.Add('-IncludeSensitiveDetails') }
     if ($Yes) { [void]$relaunch.Add('-Yes') }
     if ($NoColor) { [void]$relaunch.Add('-NoColor') }
     Assert-NRAdministrator -RelaunchArguments ($relaunch -join ' ')
     switch ($Mode) {
         'Menu' { exit (Invoke-NRMenu) }
-        'Scan' { $r = Invoke-NRScan -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } }
+        'Scan' {
+            $r = Invoke-NRScan -SkipConnectivityTest:$SkipConnectivityTest
+            if ($Json) {
+                if ($IncludeSensitiveDetails) {
+                    Write-Warning 'Scan JSON 包含本机诊断细节；请勿公开上传。'
+                    $r | ConvertTo-Json -Depth 12
+                } else {
+                    ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $r | ConvertTo-Json -Depth 12
+                }
+            }
+        }
         'Repair' { $r = Invoke-NRRepair -Deep:$false -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'DeepRepair' { $r = Invoke-NRRepair -Deep:$true -AssumeYes:$Yes -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 5 } }
         'Backup' { $r = New-NRBackup; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('备份完成：{0}' -f $r.Path) 'Green' } }
@@ -202,7 +214,7 @@ try {
         'Restore' { if (-not $BackupPath -and $RestorePointIndex -le 0) { throw 'Restore 模式必须提供 -BackupPath 或 -RestorePointIndex。' }; $r = Restore-NRBackup -BackupPath $BackupPath -RestorePointIndex $RestorePointIndex -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 6 } }
         'RestorePoints' { $r = Get-NRRestorePointSummary; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Show-NRRestorePointList -RestorePoints $r.Points; Write-NRLine ('恢复点总数 {0}，超出保留额度 {1} 个。' -f $r.Total, $r.PruneCandidates) 'DarkGray' } }
         'Prune' { $plan = Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints); Show-NRRestorePointPlan -Plan $plan; $r = Invoke-NRRestorePointPrune -Plan $plan -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine $r.Message 'Green' }; if (-not $r.Success) { exit 8 } }
-        'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
+        'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest -IncludeSensitiveDetails:$IncludeSensitiveDetails; if ($Json) { $r | ConvertTo-Json -Depth 12 } else { Write-NRLine ('报告：{0}（脱敏={1}）' -f $r.Path, $r.Sanitized) 'Green' } }
         'Gui' { Show-NRGui }
     }
     exit 0
