@@ -166,7 +166,7 @@ function Restore-NRBackup {
     if(-not $profilesReg){
         throw '该备份由旧版本生成，缺少 NetworkList-Profiles.reg。请先用当前版本重新创建备份后再执行 Restore。'
     }
-    if(!(Confirm-NRAction -Message ('即将恢复 NetMedic 管理的 Profiles/NewNetworks 范围，原始完整备份仍保留。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
+    if(!(Confirm-NRAction -Message ('即将恢复备份 [{0}] 中 NetMedic 管理的 Profiles/NewNetworks 范围，原始完整备份仍保留。继续？'-f $reg) -AssumeYes:$AssumeYes)){return [pscustomobject]@{Success=$false;Cancelled=$true;Path=$reg}}
 
     $preRestore=New-NRBackup -Level 'PreRestore'
     try {

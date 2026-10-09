@@ -1245,4 +1245,40 @@
         # --generate-notes 只会列出 PR 标题，对用户没有信息量
         $release | Should -Not -Match ([regex]::Escape('--generate-notes'))
     }
+
+    It 'includes the backup path in the restore confirmation prompt' {
+        $backup = Get-Content -LiteralPath (Join-Path $root 'src\Backup.ps1') -Raw -Encoding UTF8
+        # 修复前这里是 …继续？'-f $reg，字符串里没有 {0} 占位符，格式化无效：
+        # 用户在被问「是否恢复」时看不到将要导入哪个备份。这里锁定"真的把路径拼进提示"。
+        $backup | Should -Match ([regex]::Escape('即将恢复备份 [{0}]'))
+    }
+
+    It 'keeps the README declared version in sync with the entry script' {
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $version = ([regex]::Match($entry, "AppVersion\s*=\s*'([^']+)'")).Groups[1].Value
+        $version | Should -Match '^\d+\.\d+\.\d+$'
+
+        $readme = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw -Encoding UTF8
+        # README 顶部「当前状态」必须写上真实的 main 版本，避免"工具发新版、README 没跟上"
+        $readme | Should -Match ([regex]::Escape('分支版本 **' + $version + '**'))
+        # 旧写法"当前稳定版本：x.y.z"容易与 main 版本漂移，不再保留
+        $readme | Should -Not -Match '当前稳定版本'
+    }
+
+    It 'lists every src module in the README project structure section' {
+        $readme = Get-Content -LiteralPath (Join-Path $root 'README.md') -Raw -Encoding UTF8
+        $modules = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -Filter '*.ps1' -File)
+        $modules.Count | Should -BeGreaterThan 0
+        foreach ($module in $modules) {
+            $readme | Should -Match ([regex]::Escape($module.Name))
+        }
+    }
+
+    It 'has a changelog section for the current version' {
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $version = ([regex]::Match($entry, "AppVersion\s*=\s*'([^']+)'")).Groups[1].Value
+        $changelog = Get-Content -LiteralPath (Join-Path $root 'CHANGELOG.md') -Raw -Encoding UTF8
+        # 发布工作流按 CHANGELOG 段落生成发布正文；缺段落会直接失败，这里提前挡住
+        $changelog | Should -Match ([regex]::Escape('## [' + $version + ']'))
+    }
 }
