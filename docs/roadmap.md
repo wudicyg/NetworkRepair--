@@ -11,8 +11,6 @@
 - [x] Pester + GitHub Actions
 - [x] 发布验证只读证据采集器
 - [x] Windows 10 核心实机验证（历史编号 Profile 清理路径）
-- [ ] Windows 11 / 更多环境扩展验证（暂缓；当前不承诺兼容，不阻塞 Windows 10 发布）
-- [ ] 更多语言环境测试（后续扩展）
 
 ## v0.2.x — 更智能的诊断
 - [x] Network List Manager COM 枚举
@@ -39,8 +37,8 @@
 
 ## v1.0.x — 稳定发布
 - [x] 1.0.0 核心实机验收（Windows 10）
-- [ ] Windows 11 / 更多环境扩展验证（暂缓，非当前发布门槛）
-- [ ] 回归测试矩阵（继续扩展自动化边界用例）
+- [x] Windows 10 实机验证矩阵已通过
+- [ ] 继续扩充自动化边界回归测试
 - [x] Release 打包自动化
 - [x] GitHub Issues / Discussions 工作流
 
@@ -62,4 +60,4 @@
 - [x] 完整敏感详情需要显式 `-IncludeSensitiveDetails` 才导出
 - [x] 统一正式版/开发版说明、Release 步骤与 Windows 10 支持声明
 - [ ] 继续补充自动化隐私回归与发布包完整性检查
-- [ ] Windows 11 实机测试（待可用设备与明确需求后再启动；不列入当前适配目标）
+- Windows 11 暂不列入当前路线图；只有实际设备和明确需求出现后，再单独评估是否立项
