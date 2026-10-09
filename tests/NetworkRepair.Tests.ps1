@@ -11,6 +11,7 @@
         . (Join-Path $root 'src\RestorePoints.ps1')
         . (Join-Path $root 'src\Services.ps1')
         . (Join-Path $root 'src\Update.ps1')
+        . (Join-Path $root 'src\SanitizedReport.ps1')
         . (Join-Path $root 'src\Gui.ps1')
 
         function New-TestReleaseFeed {
@@ -166,25 +167,79 @@
     }
 
     It 'keeps sanitized bundle version synchronized with the entry script' {
+        $modulePath = Join-Path $root 'src\SanitizedReport.ps1'
         $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
         $entryPath = Join-Path $root 'NetworkRepair.ps1'
+        (Test-Path -LiteralPath $modulePath) | Should -BeTrue
+
+        # 脚本入口是薄包装：解析入口版本号后把活交给 src 模块（这样图形界面与压平后的
+        # 单文件分发能共用同一份脱敏实现）。
         $tool = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
-        $entry = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
         $tool | Should -Match 'entryVersionMatch'
         $tool | Should -Match 'entryVersionMatch.Groups\[1\]\.Value'
+        $tool | Should -Match ([regex]::Escape('SanitizedReport.ps1'))
         $tool | Should -Not -Match "'0.4.0-dev'"
+
+        $module = Get-Content -LiteralPath $modulePath -Raw -Encoding UTF8
+        $module | Should -Match '\$Script:AppVersion'
+        $module | Should -Not -Match "'0\.4\.0-dev'"
+
+        $entry = Get-Content -LiteralPath $entryPath -Raw -Encoding UTF8
         $entry | Should -Match '\$Script:AppVersion'
+        $entry | Should -Match ([regex]::Escape('SanitizedReport.ps1'))
     }
 
     It 'keeps sanitized bundle numbered profile regexes intact' {
-        $toolPath = Join-Path $root 'tools\Export-NRSanitizedDiagnosticBundle.ps1'
-        $content = Get-Content -LiteralPath $toolPath -Raw -Encoding UTF8
+        $content = Get-Content -LiteralPath (Join-Path $root 'src\SanitizedReport.ps1') -Raw -Encoding UTF8
         $content | Should -Match "\^网络\\s\+\\d\+\$"
         $content | Should -Match "\^Network\\s\+\\d\+\$"
         $content | Should -Match "\^\(网络\|Network\)\\s\+\\d\+\$"
         $content | Should -Not -Match "网络s\+d\+"
         $content | Should -Not -Match "Networks\+d\+"
     }
+
+    It 'strips every identifying field from a sanitized candidate' {
+        $candidate = [pscustomobject]@{
+            ProfileName        = '网络 3'
+            Managed            = $false
+            IsActive           = $false
+            RiskScore          = 40
+            RiskLevel          = 'Medium'
+            RemediationAllowed = $true
+            DiagnosticCodes    = @('NR-1001')
+            NetworkCorrelation = 'ExactNetworkId'
+            NlmIsConnected     = $false
+            AdapterName        = 'Intel(R) Wi-Fi 6 AX201'
+            MacAddress         = 'AA-BB-CC-DD-EE-FF'
+            NetworkId          = '{11111111-2222-3333-4444-555555555555}'
+            IPAddress          = '192.168.1.20'
+        }
+        $sanitized = ConvertTo-NRSanitizedCandidate -Candidate $candidate
+        $sanitized.ProfileClass | Should -Be 'ChineseNumbered'
+        $sanitized.RemediationAllowed | Should -BeTrue
+
+        $names = @($sanitized.PSObject.Properties.Name)
+        foreach ($forbidden in @('ProfileName', 'AdapterName', 'MacAddress', 'NetworkId', 'IPAddress')) {
+            $names | Should -Not -Contain $forbidden
+        }
+        $serialized = $sanitized | ConvertTo-Json -Depth 6
+        $serialized | Should -Not -Match 'AA-BB-CC-DD-EE-FF'
+        $serialized | Should -Not -Match '192\.168\.1\.20'
+        $serialized | Should -Not -Match '11111111-2222'
+    }
+
+    It 'exports the sanitized bundle from the window and warns on the full report' {
+        # 图形界面的用户会把文件发到公开 Issue，按钮必须走脱敏导出
+        $gui = Get-Content -LiteralPath (Join-Path $root 'src\Gui.ps1') -Raw -Encoding UTF8
+        $gui | Should -Match 'Export-NRSanitizedDiagnosticBundle'
+        $gui | Should -Not -Match 'Export-NRReport'
+
+        # 命令行仍可产出完整报告，但必须明确警告敏感数据
+        $entry = Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8
+        $entry | Should -Match '请勿直接公开分享'
+        $entry | Should -Match ([regex]::Escape('Export-NRSanitizedDiagnosticBundle'))
+    }
+
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
     }
@@ -1154,5 +1209,40 @@
         $update | Should -Match 'Tls12'
         # SystemDefault 不能被改写成「仅 TLS 1.2」，否则现代系统上反而更容易失败
         $update | Should -Match 'SystemDefault'
+    }
+
+    It 'builds the release notes from the changelog section' {
+        $tool = Join-Path $root 'tools\Get-NRReleaseNotes.ps1'
+        (Test-Path -LiteralPath $tool) | Should -BeTrue
+
+        $version = ([regex]::Match((Get-Content -LiteralPath (Join-Path $root 'NetworkRepair.ps1') -Raw -Encoding UTF8), "AppVersion\s*=\s*'([^']+)'")).Groups[1].Value
+        $output = Join-Path ([IO.Path]::GetTempPath()) ('release-notes-' + [guid]::NewGuid().ToString('N') + '.md')
+        try {
+            $result = & $tool -Version $version -OutputPath $output | ConvertFrom-Json
+            $result.Success | Should -BeTrue
+            $result.Version | Should -Be $version
+            $body = Get-Content -LiteralPath $output -Raw -Encoding UTF8
+            # 发布页正文要能自己说清更新了什么、该下哪个文件
+            $body | Should -Match ([regex]::Escape('NetMedic ' + $version))
+            $body | Should -Match '该下载哪个文件'
+            $body | Should -Match ([regex]::Escape(('NetMedic-{0}-Portable.exe' -f $version)))
+            $body | Should -Match ([regex]::Escape(('NetMedic_{0}_Windows.zip' -f $version)))
+            $body | Should -Match ([regex]::Escape('网络医生.exe'))
+            $body | Should -Match 'CHANGELOG.md'
+        } finally {
+            if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Force }
+        }
+
+        # 目标版本没有 CHANGELOG 段落时必须失败，避免发布出空白正文
+        { & $tool -Version '0.0.1-notexist' -OutputPath $output } | Should -Throw
+        (Test-Path -LiteralPath $output) | Should -BeFalse
+    }
+
+    It 'publishes changelog based release notes instead of only pull request titles' {
+        $release = Get-Content -LiteralPath (Join-Path $root '.github\workflows\release.yml') -Raw -Encoding UTF8
+        $release | Should -Match ([regex]::Escape('Get-NRReleaseNotes.ps1'))
+        $release | Should -Match ([regex]::Escape('--notes-file'))
+        # --generate-notes 只会列出 PR 标题，对用户没有信息量
+        $release | Should -Not -Match ([regex]::Escape('--generate-notes'))
     }
 }
