@@ -198,7 +198,7 @@
         $diagnostics=[pscustomobject]@{
             Timestamp='2026-10-09T00:00:00Z';
             Windows=[pscustomobject]@{Caption='Windows 10 Pro';Version='10.0';Build='19045';Architecture='64-bit';PowerShell='5.1'};
-            NetworkHealth=[pscustomobject]@{Status='Healthy';OperationallyHealthy=$true;Reason='Connectivity confirmed';NCSIHealthy=$true;NCSIKnown=$true;InternetProfileCount=1};
+            NetworkHealth=[pscustomobject]@{Status='Healthy';OperationallyHealthy=$true;Reason='CANARY_HEALTH_REASON_123';NCSIHealthy=$true;NCSIKnown=$true;InternetProfileCount=1};
             ProfileHygieneStatus='HistoricalProfilesFound';RepairRecommendation='CleanHistoricalProfiles';SafeCandidateCount=1;HighRiskCount=0;
             Candidates=@($candidate);
             Connections=@([pscustomobject]@{Name='PRIVATE-OFFICE';InterfaceAlias='SECRET-WIFI';NetworkCategory='Private';IPv4Connectivity='Internet';IPv6Connectivity='NoTraffic'});
@@ -217,7 +217,7 @@
         $summary.NumberedProfileCount | Should -Be 1
         $summary.Candidates[0].ProfileClass | Should -Be 'EnglishNumbered'
         $json=$summary | ConvertTo-Json -Depth 12
-        foreach ($secret in @('SECRET-KEY','SECRET-NETWORK-ID','PRIVATE-OFFICE','SECRET-WIFI','SECRET-ADAPTER','192.168.10.55','192.168.10.1','AA-BB-CC-DD-EE-FF','HKLM:\\PRIVATE-PATH','private-url.invalid','Private issue text')) {
+        foreach ($secret in @('SECRET-KEY','SECRET-NETWORK-ID','PRIVATE-OFFICE','SECRET-WIFI','SECRET-ADAPTER','192.168.10.55','192.168.10.1','AA-BB-CC-DD-EE-FF','HKLM:\\PRIVATE-PATH','private-url.invalid','Private issue text','CANARY_HEALTH_REASON_123')) {
             $json | Should -Not -Match ([regex]::Escape($secret))
         }
     }
@@ -235,6 +235,11 @@
         $validation | Should -Match ([regex]::Escape('[switch]$IncludeSensitiveDetails'))
         $validation | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $diagnostics'))
         $validation | Should -Match 'SensitiveDetails'
+        $entry | Should -Match ([regex]::Escape('ConvertTo-NRSanitizedDiagnosticSummary -Diagnostics $r'))
+        $entry | Should -Match 'Scan JSON'
+        $entry | Should -Match ([regex]::Escape('Sanitized = $false'))
+        $diagnostics | Should -Not -Match 'NetworkHealth = \$Diagnostics\.NetworkHealth'
+        $diagnostics | Should -Not -Match 'DiagnosticCodes = @\(\$_\.DiagnosticCodes\)'
     }
     It 'exposes NCSI configuration reader' {
         (Get-Command Get-NRNcsiConfiguration -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
