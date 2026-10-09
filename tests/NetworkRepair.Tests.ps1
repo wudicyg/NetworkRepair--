@@ -1045,7 +1045,7 @@
         $tool | Should -Match 'function ConvertTo-NRFileVersion'
         $tool | Should -Match ([regex]::Escape('$fileVersion = ConvertTo-NRFileVersion -Version $version'))
         $tool | Should -Match ([regex]::Escape('Version     = $fileVersion'))
-        $tool | Should -Not -Match ([regex]::Escape("Version     = ('{0}.0' -f $version)"))
+        $tool | Should -Not -Match ([regex]::Escape('Version     = (''{0}.0'' -f $version)'))
     }
 
     It 'ships a valid multi-size application icon' {
