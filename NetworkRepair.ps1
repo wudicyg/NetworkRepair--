@@ -9,6 +9,7 @@ param(
     [string]$NewName,
     [switch]$Json,
     [switch]$SkipConnectivityTest,
+    [switch]$IncludeSensitiveDetails,
     [switch]$Yes,
     [switch]$NoColor
 )
@@ -184,6 +185,7 @@ try {
     if ($NewName) { [void]$relaunch.Add('-NewName'); [void]$relaunch.Add(('"{0}"' -f $NewName)) }
     if ($Json) { [void]$relaunch.Add('-Json') }
     if ($SkipConnectivityTest) { [void]$relaunch.Add('-SkipConnectivityTest') }
+    if ($IncludeSensitiveDetails) { [void]$relaunch.Add('-IncludeSensitiveDetails') }
     if ($Yes) { [void]$relaunch.Add('-Yes') }
     if ($NoColor) { [void]$relaunch.Add('-NoColor') }
     Assert-NRAdministrator -RelaunchArguments ($relaunch -join ' ')
@@ -202,7 +204,7 @@ try {
         'Restore' { if (-not $BackupPath -and $RestorePointIndex -le 0) { throw 'Restore 模式必须提供 -BackupPath 或 -RestorePointIndex。' }; $r = Restore-NRBackup -BackupPath $BackupPath -RestorePointIndex $RestorePointIndex -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 }; if (-not $r.Success) { exit 6 } }
         'RestorePoints' { $r = Get-NRRestorePointSummary; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Show-NRRestorePointList -RestorePoints $r.Points; Write-NRLine ('恢复点总数 {0}，超出保留额度 {1} 个。' -f $r.Total, $r.PruneCandidates) 'DarkGray' } }
         'Prune' { $plan = Get-NRRestorePointRetentionPlan -RestorePoints @(Get-NRRestorePoints); Show-NRRestorePointPlan -Plan $plan; $r = Invoke-NRRestorePointPrune -Plan $plan -AssumeYes:$Yes; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine $r.Message 'Green' }; if (-not $r.Success) { exit 8 } }
-        'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
+        'Report' { $r = Export-NRReport -Path $ReportPath -SkipConnectivityTest:$SkipConnectivityTest -IncludeSensitiveDetails:$IncludeSensitiveDetails; if ($Json) { $r | ConvertTo-Json -Depth 8 } else { Write-NRLine ('报告：{0}' -f $r.Path) 'Green' } }
         'Gui' { Show-NRGui }
     }
     exit 0
