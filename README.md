@@ -42,7 +42,7 @@ NetMedic 的核心任务不是“重置整个网络”，而是解决 Windows �
 - Profile GUID ↔ NetworkId 精确关联
 - 基于 Network List Manager 的显式网络重命名
 - 独立 Repair Planner：统一修复决策与真实执行计划
-- Deep Repair 在无可删除 Profile 时仍可明确刷新 `NewNetworks`
+- Deep Repair 仅在网络状态需要调查或存在安全清理对象时可刷新 `NewNetworks`；健康网络且没有可安全清理的候选时不会进入破坏性路径
 - Restore 只导入 NetMedic 管理的 `Profiles` / `NewNetworks` 范围，完成 scoped 快照校验；失败自动回到恢复前安全备份
 - 网络健康与 Profile 历史遗留分离判断：网络健康时仍会识别并处理 `网络 2/3/4...` 历史 Profile
 - 多级恢复点：备份按 `Manual` / `PreRepair` / `PreRestore` 分级，可列举、按序号恢复、固定保护，并按保留额度显式清理
