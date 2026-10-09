@@ -1,9 +1,16 @@
 # Architecture
 
 ```text
-BAT launcher
+入口层
+    ├─ 网络医生.exe（单文件 exe，默认 -Mode Gui，含 requireAdministrator 清单与应用图标）
+    ├─ 备用启动\启动-网络医生.bat（控制台 TUI，显式 -Mode Menu）
+    └─ NetworkRepair.bat（仅源码仓库，等价 powershell -File NetworkRepair.ps1）
     ↓
-NetworkRepair.ps1
+NetworkRepair.ps1（$Script:AppVersion）
+    ├─ 诊断 / 修复 / 恢复 链路（见下）
+    ├─ 图形界面（src/Gui.ps1，-Mode Gui / GuiSmoke）
+    ├─ 更新检查（src/Update.ps1，-Mode CheckUpdate；只读、不自动替换）
+    └─ 脱敏诊断包（src/SanitizedReport.ps1；GUI 导出走这里）
     ↓
 Diagnostics
     ├─ Network Health Assessment
@@ -15,7 +22,7 @@ Repair Planner
     ├─ Safe Repair → eligible profile deletions
     └─ Deep Repair → explicit NewNetworks refresh
     ↓
-Backup
+Backup / RestorePoints（Manual / PreRepair / PreRestore，可固定与显式清理）
     ↓
 Repair / Restore
     ↓
@@ -81,6 +88,9 @@ Restore 在导入目标 `.reg` 前创建当前状态的安全备份。导入后�
 `src/Update.ps1` 查询 GitHub 发布页的最新版本并与当前版本比较，不涉及本机任何配置。
 
 - **只检查、只告知**：不自动下载、不自动替换自身。自替换需要提权、代码签名与失败回滚，属于新的风险面，与项目「先诊断、先备份、可回滚」的姿态不符；是否升级由用户自己决定。
+- **数据源优先级**：优先读取 `releases.atom`（公开、无需令牌、**没有速率限制**）；失败才回退 REST API `/releases/latest`（信息更全，但匿名调用每 IP 每小时仅 60 次，实测在共享出口 IP 上会直接返回 403，因此只能当后备）。CI 断言首选源确实生效，避免静默退化。
+- **TLS 兼容**：检查期间按需为 Windows PowerShell 5.1 补启 TLS 1.2（当前是 `SystemDefault` 时不动，否则会把系统默认策略改窄），结束后还原原值。
+- **脱敏与完整报告分离**：`src/SanitizedReport.ps1` 产出可公开发布的脱敏诊断包（排除机器名、MAC、IP、注册表路径、NetworkId、URL 与凭据），图形界面的「导出诊断报告」走这里；含敏感字段的完整报告只保留给命令行 `-Mode Report` 与菜单 `[6]`，并且这两条路径都会打印敏感数据警告。
 - **可测的纯函数**：版本解析（`ConvertTo-NRVersionParts`）与比较（`Compare-NRVersion`）不碰网络。按主/次/修订号逐位数字比较（不是字符串比较，否则 `1.10.0` 会被判成比 `1.2.0` 旧），数字相同时带预发布后缀的一侧更旧；无法解析时返回空值而不是抛异常。
 - **失败不致命**：`Get-NRLatestRelease` 把网络异常收敛成 `Success=$false` + `Error`，绝不向上抛。检查失败只记一条 WARN 日志。
 - **不阻塞用户**：命令行 `-Mode CheckUpdate` 放在提权检查之前（只读检查不需要管理员权限），失败退出码 9、成功 0；界面里的启动检查只在诊断结果网络健康时进行，网络不通就跳过，因为本工具常被用来修网络。
