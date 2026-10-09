@@ -1,4 +1,4 @@
-﻿# 协作流程
+# 协作流程
 
 本文件说明 NetMedic 的问题反馈、方案讨论、代码贡献与发布流程。目标：让每一次改动都留下可核查的证据，并始终保持 `main` 可发布。
 
@@ -34,17 +34,19 @@
 PR 合并前必须满足：
 
 1. 填写 [PR 模板](../.github/PULL_REQUEST_TEMPLATE.md) 中的变更说明、测试、安全、发布相关检查项；
-2. CI 全绿——Windows PowerShell 5.1 与 PowerShell 7 两条腿的语法解析 + Pester，以及发布包冒烟测试；
+2. CI 全绿——Windows PowerShell 5.1 与 PowerShell 7 两条腿的语法解析 + Pester，以及「发布包冒烟测试」作业（构建发布包、校验包内容与 SHA-256、真实运行单文件入口、启动图形版 exe、**联网验证一次更新检查**）；
 3. 涉及修改系统状态的功能，必须说明备份、验证与回滚路径；
 4. 涉及版本变更时同步 README / CHANGELOG；
 5. 统一使用 Squash merge，保持 `main` 线性历史。
 
+> 工作流文件必须保持**纯 ASCII**（GitHub Actions 以无 BOM 的 UTF-8 写入 `run:` 脚本，Windows PowerShell 5.1 在中文环境下会误判编码导致解析失败）。需要中文的步骤请写进带 BOM 的仓库脚本，例如 `tools/Test-NRReleasePackage.ps1` 与 `tools/Get-NRReleaseNotes.ps1`。
+
 ## 5. 发布流程
 
-1. 在 `main` 上完成版本号与 CHANGELOG 收口：`NetworkRepair.ps1` 中的 `$Script:AppVersion` **必须等于**标签版本。
+1. 走分支 + PR 完成版本收口并合并到 `main`：把 `NetworkRepair.ps1` 里的 `$Script:AppVersion` 提升到目标版本，并把 `CHANGELOG.md` 的 `Unreleased` 段落定稿为 `## [<版本>] - <日期>`。**版本号只在这一处硬编码**，标签必须与其完全一致。
 2. 推送 `v<版本>` 标签，触发 [`.github/workflows/release.yml`](../.github/workflows/release.yml)。
-3. 工作流依次：校验标签与版本一致 → 运行 Pester → 构建发布包与 SHA-256 → 创建 GitHub Release。
-4. 标签含 `-`（例如 `v1.1.0-beta.1`）会被自动标记为 Prerelease。
+3. 工作流依次：校验标签与版本一致 → 运行 Pester → 构建发布包并生成 SHA-256 → **从 CHANGELOG 对应段落生成发布正文**（若缺该段落则直接失败）→ 创建 GitHub Release → 写入附件的中文标签。
+4. 标签含 `-`（例如 `v1.5.0-beta.1`）会被自动标记为 Prerelease。
 5. 发布完成后在 Discussions · Announcements 补充发布说明。
 
 ## 6. 敏感信息
