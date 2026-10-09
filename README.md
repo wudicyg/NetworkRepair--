@@ -108,7 +108,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\\tools\\New-NRReleasePackage.ps1
 
 发布包由带 `v` 前缀的版本 Tag 触发 GitHub Actions 自动构建，并生成 ZIP 与 SHA-256 校验文件。发布 Tag 必须与 `NetworkRepair.ps1` 中的版本完全一致。
 
-诊断报告默认输出**脱敏摘要**。只有显式添加 `-IncludeSensitiveDetails` 才会导出包含本机标识的完整诊断数据；完整报告只应保存在本机安全位置，不要上传到公开 Issue / PR。
+诊断报告默认输出**脱敏摘要**；`-Mode Scan -Json` 也默认只输出白名单脱敏摘要。只有显式添加 `-IncludeSensitiveDetails` 才会输出包含本机标识的完整诊断数据；完整报告只应保存在本机安全位置，不要上传到公开 Issue / PR。
 
 只读验收工具也默认导出脱敏摘要：
 
