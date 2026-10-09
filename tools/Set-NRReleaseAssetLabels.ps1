@@ -4,8 +4,9 @@
     为 GitHub Release 附件设置中文显示标签。
 
 .DESCRIPTION
-    GitHub 会剥掉附件名里的非 ASCII 字符（实测：上传「网络医生_1.0.0.exe」会存成「_1.0.0.exe」），
-    因此发布页附件名必须使用 ASCII；中文名称改由附件的 label 字段承载，在 Releases 页面展示。
+    GitHub 会剥掉附件名里的非 ASCII 字符（历史实测：1.0.0 时期的「网络修复工具_1.0.0.exe」会存成
+    「_1.0.0.exe」），因此发布页附件名固定使用 ASCII 的 NetMedic-<版本>-Portable.exe 与
+    NetMedic_<版本>_Windows.zip；中文名称改由附件的 label 字段承载，在 Releases 页面展示。
 
     因为本文件包含中文字面量，必须保持 UTF-8 BOM，这样发布工作流的步骤本身可以保持纯 ASCII
     （GitHub Actions 会把 run 脚本写成不带 BOM 的 UTF-8，PowerShell 5.1 在中文区域会解析失败）。
