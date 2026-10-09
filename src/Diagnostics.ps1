@@ -230,7 +230,10 @@ function Export-NRReport {
         ReadOnly = $true
         Diagnostics = $payload
     }
-}function Get-NRIPDiagnostics {
+}
+
+
+function Get-NRIPDiagnostics {
     $rows = @()
     try {
         $configs = @(Get-NetIPConfiguration -All -ErrorAction Stop)
